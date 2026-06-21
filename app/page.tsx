@@ -5,7 +5,6 @@ import { PsychologySelector }  from "@/components/journal/PsychologySelector";
 import { ChecklistProgress }   from "@/components/journal/ChecklistProgress";
 import { RulesList }           from "@/components/journal/RulesList";
 import { TradeSummary }        from "@/components/journal/TradeSummary";
-import { NewsAlarms }           from "@/components/journal/NewsAlarms";
 export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-5">
@@ -23,11 +22,6 @@ export default function Dashboard() {
         <div className="anim-fade-up d-200"><SessionSelector /></div>
         <div className="anim-fade-up d-300"><PairWatchlist /></div>
         <div className="anim-fade-up d-400"><PsychologySelector /></div>
-      </div>
-
-      {/* News Alarms */}
-      <div className="anim-fade-up d-400">
-        <NewsAlarms />
       </div>
 
       {/* Progress */}

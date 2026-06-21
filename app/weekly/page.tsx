@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { TrendingUp, TrendingDown, Save, ChevronLeft, ChevronRight, Target, AlertTriangle, FileText } from "lucide-react";
+import { NewsAlarms } from "@/components/journal/NewsAlarms";
 
 const PAIRS = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD", "GBP/JPY", "EUR/JPY", "USD/CAD", "AUD/USD"];
 const WEEKLY_KEY = "sabar-weekly-outlook";
@@ -184,6 +185,9 @@ export default function WeeklyOutlookPage() {
           className="w-full bg-transparent font-sans text-sm text-white placeholder-[#333] focus:outline-none resize-none leading-relaxed"
         />
       </div>
+
+      {/* News Alarms */}
+      <NewsAlarms />
 
       {/* Save */}
       <button onClick={saveAll}
