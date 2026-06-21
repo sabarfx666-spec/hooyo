@@ -6,13 +6,10 @@ import { LayoutDashboard, BarChart2, ScrollText, CalendarDays, Globe, User, Cloc
 import { useAuth } from "@/store/AuthContext";
 
 const navItems = [
-  { href: "/",          label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/risk",      label: "Risk",           icon: BarChart2        },
-  { href: "/weekly",    label: "Weekly Outlook", icon: TrendingUp       },
-  { href: "/journal",   label: "Journal",        icon: BookOpen         },
-  { href: "/history",   label: "History",        icon: ScrollText       },
-  { href: "/calendar",  label: "Calendar",       icon: CalendarDays     },
-  { href: "/economic",  label: "Economic",       icon: Globe            },
+  { href: "/",         label: "Dashboard",      icon: LayoutDashboard },
+  { href: "/weekly",   label: "Weekly Outlook", icon: TrendingUp       },
+  { href: "/journal",  label: "Journal",        icon: BookOpen         },
+  { href: "/calendar", label: "Calendar",       icon: CalendarDays     },
 ];
 
 function LiveClock() {
