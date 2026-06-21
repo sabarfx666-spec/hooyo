@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   TrendingUp, TrendingDown, ChevronLeft, ChevronRight,
-  Upload, X, Image as ImageIcon, FileText, Check, Send,
+  Upload, X, Image as ImageIcon, FileText, Check, Send, Settings,
 } from "lucide-react";
 import { NewsAlarms } from "@/components/journal/NewsAlarms";
 
@@ -57,7 +57,10 @@ export default function WeeklyOutlookPage() {
   const [savedPairs, setSavedPairs] = useState<string[]>(["EUR/USD","GBP/USD","XAU/USD","GBP/JPY"]);
   const [pairInput, setPairInput] = useState("");
   const [dragOver, setDragOver]   = useState<string | null>(null);
-  const [discord, setDiscord]     = useState<"idle"|"sending"|"sent"|"error">("idle");
+  const [discord, setDiscord]       = useState<"idle"|"sending"|"sent"|"error">("idle");
+  const [showDiscordSettings, setShowDiscordSettings] = useState(false);
+  const [webhookInput, setWebhookInput] = useState("");
+  const [webhookSaved, setWebhookSaved] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(false);
   const fileRefBefore = useRef<HTMLInputElement>(null);
   const fileRefAfter  = useRef<HTMLInputElement>(null);
@@ -67,6 +70,8 @@ export default function WeeklyOutlookPage() {
       const raw = localStorage.getItem(WEEKLY_KEY);
       if (raw) setEntries(JSON.parse(raw));
       const sp = localStorage.getItem(SAVED_PAIRS_KEY);
+      const wh = localStorage.getItem(DISCORD_KEY);
+      if (wh) setWebhookInput(wh);
       if (sp) setSavedPairs(JSON.parse(sp));
     } catch {}
   }, []);
@@ -354,35 +359,6 @@ export default function WeeklyOutlookPage() {
         {/* RIGHT */}
         <div className="space-y-4">
 
-          {/* Pair biases */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Bias Per Pair</p>
-            <div className="space-y-2">
-              {PAIRS.map(pair => {
-                const b = entry.biases[pair] ?? "NEUTRAL";
-                return (
-                  <div key={pair} className="flex items-center justify-between px-3 py-2.5 rounded-xl"
-                    style={{ background: "#111", border: "1px solid #1A1A1A" }}>
-                    <span className="font-mono text-sm font-bold text-white">{pair}</span>
-                    <div className="flex gap-1">
-                      {(["BULLISH","NEUTRAL","BEARISH"] as const).map(bias => (
-                        <button key={bias} onClick={() => save({ biases: { ...entry.biases, [pair]: bias } })}
-                          className="px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold transition-all"
-                          style={{
-                            background: b === bias ? bias === "BULLISH" ? "rgba(0,255,127,0.2)" : bias === "BEARISH" ? "rgba(255,59,59,0.2)" : "#222" : "transparent",
-                            border:     `1px solid ${b === bias ? bias === "BULLISH" ? "rgba(0,255,127,0.4)" : bias === "BEARISH" ? "rgba(255,59,59,0.4)" : "#444" : "#1A1A1A"}`,
-                            color:      b === bias ? bias === "BULLISH" ? "#00FF7F" : bias === "BEARISH" ? "#FF3B3B" : "#888" : "#2A2A2A",
-                          }}>
-                          {bias === "BULLISH" ? "▲" : bias === "BEARISH" ? "▼" : "—"}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
           {/* Key Levels */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
             <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Key Levels</p>
@@ -435,6 +411,49 @@ export default function WeeklyOutlookPage() {
         {entry.done ? "✓ WEEK COMPLETE" : "+ MARK WEEK COMPLETE"}
       </button>
 
+      {/* Discord Settings Panel */}
+      {showDiscordSettings && (
+        <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid rgba(88,101,242,0.3)" }}>
+          <div className="flex items-center justify-between">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#5865F2" }}>Discord Webhook</p>
+            <button onClick={() => setShowDiscordSettings(false)} style={{ color: "#333" }}><X size={13} /></button>
+          </div>
+          <p className="font-sans text-[10px]" style={{ color: "#444" }}>
+            Paste your Discord webhook URL to send weekly outlook summaries to a channel.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={webhookInput}
+              onChange={e => setWebhookInput(e.target.value)}
+              placeholder="https://discord.com/api/webhooks/..."
+              className="flex-1 px-3 py-2.5 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none"
+              style={{ background: "#111", border: "1px solid #222" }}
+            />
+            <button
+              onClick={() => {
+                localStorage.setItem(DISCORD_KEY, webhookInput.trim());
+                setWebhookSaved(true);
+                setTimeout(() => { setWebhookSaved(false); setShowDiscordSettings(false); }, 1500);
+              }}
+              className="px-4 py-2.5 rounded-lg font-mono text-xs font-bold transition-all"
+              style={{
+                background: webhookSaved ? "rgba(0,255,127,0.15)" : "rgba(88,101,242,0.15)",
+                border: `1px solid ${webhookSaved ? "rgba(0,255,127,0.35)" : "rgba(88,101,242,0.35)"}`,
+                color: webhookSaved ? "#00FF7F" : "#5865F2",
+              }}>
+              {webhookSaved ? <><Check size={12} /> Saved</> : "Save"}
+            </button>
+          </div>
+          {webhookInput && (
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#00FF7F" }} />
+              <span className="font-mono text-[9px]" style={{ color: "#00FF7F" }}>Webhook connected</span>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bottom row: Save + Discord */}
       <div className="grid grid-cols-2 gap-3">
         <button onClick={() => { localStorage.setItem(WEEKLY_KEY, JSON.stringify(entries)); setSaveFeedback(true); setTimeout(() => setSaveFeedback(false), 2000); }}
@@ -447,16 +466,27 @@ export default function WeeklyOutlookPage() {
           {saveFeedback ? <><Check size={14} /> Saved</> : "Save Outlook"}
         </button>
 
-        <button onClick={sendDiscord} disabled={discord === "sending"}
-          className="py-3 rounded-xl font-mono text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-          style={{
-            background: discord === "sent"  ? "rgba(0,255,127,0.12)" : discord === "error" ? "rgba(255,59,59,0.12)" : "rgba(88,101,242,0.1)",
-            border:     `1px solid ${discord === "sent" ? "rgba(0,255,127,0.3)" : discord === "error" ? "rgba(255,59,59,0.3)" : "rgba(88,101,242,0.3)"}`,
-            color:      discord === "sent"  ? "#00FF7F"  : discord === "error" ? "#FF3B3B" : "#5865F2",
-          }}>
-          <Send size={14} />
-          {discord === "sending" ? "Sending…" : discord === "sent" ? "Sent!" : discord === "error" ? "Failed" : "Send to Discord"}
-        </button>
+        <div className="flex gap-1">
+          <button onClick={sendDiscord} disabled={discord === "sending"}
+            className="flex-1 py-3 rounded-xl font-mono text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
+            style={{
+              background: discord === "sent"  ? "rgba(0,255,127,0.12)" : discord === "error" ? "rgba(255,59,59,0.12)" : "rgba(88,101,242,0.1)",
+              border:     `1px solid ${discord === "sent" ? "rgba(0,255,127,0.3)" : discord === "error" ? "rgba(255,59,59,0.3)" : "rgba(88,101,242,0.3)"}`,
+              color:      discord === "sent"  ? "#00FF7F" : discord === "error" ? "#FF3B3B" : "#5865F2",
+            }}>
+            <Send size={14} />
+            {discord === "sending" ? "Sending…" : discord === "sent" ? "Sent!" : discord === "error" ? "Failed" : "Send to Discord"}
+          </button>
+          <button onClick={() => setShowDiscordSettings(v => !v)}
+            className="px-3 rounded-xl transition-all"
+            style={{
+              background: showDiscordSettings ? "rgba(88,101,242,0.2)" : "rgba(88,101,242,0.08)",
+              border: `1px solid ${showDiscordSettings ? "rgba(88,101,242,0.5)" : "rgba(88,101,242,0.25)"}`,
+              color: "#5865F2",
+            }}>
+            <Settings size={14} />
+          </button>
+        </div>
       </div>
 
     </div>
