@@ -14,7 +14,12 @@ export interface Rule {
   label: string;
   category: "BASIS" | "ENTRY";
   checked: boolean;
+  tag?: "EITHER_OR";
+  note?: string;
+  indent?: boolean;
 }
+
+export type BiasRuleSet = Record<"BULLISH" | "BEARISH", Rule[]>;
 
 export interface Trade {
   id: string;
@@ -46,6 +51,7 @@ export interface Trade {
 export interface SabarState {
   pairs: WatchlistPair[];
   rules: Rule[];
+  biasRules: BiasRuleSet;
   trades: Trade[];
   selectedDate: string;
   currentBias: Bias;
@@ -71,6 +77,10 @@ export type Action =
   | { type: "REMOVE_PAIR"; payload: string }
   | { type: "REMOVE_RULE"; payload: string }
   | { type: "REORDER_RULES"; payload: { category: "BASIS" | "ENTRY"; fromIndex: number; toIndex: number } }
+  | { type: "TOGGLE_BIAS_RULE"; payload: { bias: Bias; id: string } }
+  | { type: "ADD_BIAS_RULE"; payload: { bias: Bias; label: string; category: "BASIS" | "ENTRY" } }
+  | { type: "REMOVE_BIAS_RULE"; payload: { bias: Bias; id: string } }
+  | { type: "REORDER_BIAS_RULES"; payload: { bias: Bias; category: "BASIS" | "ENTRY"; fromIndex: number; toIndex: number } }
   | { type: "RESET_CHECKLIST" }
   | { type: "DELETE_TRADE"; payload: string }
   | { type: "UPDATE_TRADE"; payload: { id: string; chartProof?: string; notes?: string; chartProofs?: Partial<Record<"5M" | "15M" | "4H" | "Daily" | "Result", string>> } }

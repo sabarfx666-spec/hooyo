@@ -1,12 +1,13 @@
 "use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, ClipboardList, BarChart2, ScrollText, CalendarDays } from "lucide-react";
+import { LayoutDashboard, ClipboardList, BarChart2, ScrollText, CalendarDays, Target } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/checklist", label: "Checklist", icon: ClipboardList },
+  { href: "/habits", label: "Habits", icon: Target },
   { href: "/risk", label: "Risk", icon: BarChart2 },
   { href: "/history", label: "History", icon: ScrollText },
   { href: "/calendar", label: "Calendar", icon: CalendarDays },

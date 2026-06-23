@@ -1,16 +1,57 @@
 "use client";
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from "react";
-import { SabarState, Action, Trade } from "./types";
+import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
 import { defaultPairs, defaultRules, sampleTrades } from "./seedData";
 
 const today = new Date().toISOString().split("T")[0];
 
 const STORAGE_KEY = "sabar-state";
 
+const mkRule = (id: string, label: string, category: "BASIS"|"ENTRY", opts?: Partial<Rule>): Rule =>
+  ({ id, label, category, checked: false, ...opts });
+
+const defaultBiasRules: BiasRuleSet = {
+  BULLISH: [
+    mkRule("bb1", "Daily Order-flow +DOL",                     "BASIS"),
+    mkRule("bb2", "Daily Order-flow +ICR",                     "BASIS", { tag: "EITHER_OR" }),
+    mkRule("bb3", "Daily Order-flow +CRT",                     "BASIS", { tag: "EITHER_OR", indent: true }),
+    mkRule("bb4", "Monday Up rule",                            "BASIS"),
+    mkRule("bb5", "4H A to B + POI+ ERL",                     "BASIS", { tag: "EITHER_OR" }),
+    mkRule("bb6", "A to B +LQ:Engineering+ POI+ ERL",         "BASIS", { tag: "EITHER_OR", indent: true }),
+    mkRule("bb7", "4H Order-flow +CRT",                       "BASIS"),
+    mkRule("be1", "A to B discount joogta",                   "ENTRY"),
+    mkRule("be2", "Time window",                              "ENTRY"),
+    mkRule("be3", "PDL/london L+ LQ isolation",               "ENTRY"),
+    mkRule("be4", "SMT/3D",                                   "ENTRY", { note: "↳ Below the OP" }),
+    mkRule("be5", "5 minute SHIFT+FVG/BB",                    "ENTRY", { tag: "EITHER_OR" }),
+    mkRule("be6", "15m model #1",                             "ENTRY", { tag: "EITHER_OR", indent: true }),
+    mkRule("be7", "SL Swing ka dabadiisa dhigo",              "ENTRY"),
+    mkRule("be8", "BSLQ target",                              "ENTRY"),
+  ],
+  BEARISH: [
+    mkRule("rb1", "Daily Order-flow bearish +DOL",            "BASIS"),
+    mkRule("rb2", "Daily Order-flow +ICR",                    "BASIS", { tag: "EITHER_OR" }),
+    mkRule("rb3", "Daily Order-flow +CRT",                    "BASIS", { tag: "EITHER_OR", indent: true }),
+    mkRule("rb4", "Monday drop rule",                         "BASIS"),
+    mkRule("rb5", "4H A to B + POI+ ERL",                    "BASIS", { tag: "EITHER_OR" }),
+    mkRule("rb6", "A to B +LQ:Engineering+ POI+ ERL",        "BASIS", { tag: "EITHER_OR", indent: true }),
+    mkRule("rb7", "4H Order-flow +CRT",                      "BASIS"),
+    mkRule("re1", "A to B premium joogta",                   "ENTRY"),
+    mkRule("re2", "Time window",                             "ENTRY"),
+    mkRule("re3", "PDH/london H+ LQ isolation",              "ENTRY"),
+    mkRule("re4", "SMT/3D",                                  "ENTRY", { note: "↳ Above the OP" }),
+    mkRule("re5", "5 minute SHIFT+FVG/BB",                   "ENTRY", { tag: "EITHER_OR" }),
+    mkRule("re6", "15m model #1",                            "ENTRY", { tag: "EITHER_OR", indent: true }),
+    mkRule("re7", "SL Swing ka dabadiisa dhigo",             "ENTRY"),
+    mkRule("re8", "SSLQ target",                             "ENTRY"),
+  ],
+};
+
 const initialState: SabarState = {
   pairs: defaultPairs,
   rules: defaultRules,
+  biasRules: defaultBiasRules,
   trades: sampleTrades,
   selectedDate: today,
   currentBias: "BULLISH",
@@ -79,10 +120,40 @@ function reducer(state: SabarState, action: Action): SabarState {
       return { ...state, rules: [...otherRules, ...reordered] };
     }
 
+    case "TOGGLE_BIAS_RULE": {
+      const { bias, id } = action.payload;
+      return { ...state, biasRules: { ...state.biasRules, [bias]: state.biasRules[bias].map(r => r.id === id ? { ...r, checked: !r.checked } : r) } };
+    }
+
+    case "ADD_BIAS_RULE": {
+      const { bias, label, category } = action.payload;
+      const newRule = mkRule(`${bias[0].toLowerCase()}${category[0].toLowerCase()}-${Date.now()}`, label, category);
+      return { ...state, biasRules: { ...state.biasRules, [bias]: [...state.biasRules[bias], newRule] } };
+    }
+
+    case "REMOVE_BIAS_RULE": {
+      const { bias, id } = action.payload;
+      return { ...state, biasRules: { ...state.biasRules, [bias]: state.biasRules[bias].filter(r => r.id !== id) } };
+    }
+
+    case "REORDER_BIAS_RULES": {
+      const { bias, category, fromIndex, toIndex } = action.payload;
+      const catRules = state.biasRules[bias].filter(r => r.category === category);
+      const other    = state.biasRules[bias].filter(r => r.category !== category);
+      const reordered = [...catRules];
+      const [moved] = reordered.splice(fromIndex, 1);
+      reordered.splice(toIndex, 0, moved);
+      return { ...state, biasRules: { ...state.biasRules, [bias]: [...other, ...reordered] } };
+    }
+
     case "RESET_CHECKLIST":
       return {
         ...state,
         rules: state.rules.map((r) => ({ ...r, checked: false })),
+        biasRules: {
+          BULLISH: state.biasRules.BULLISH.map(r => ({ ...r, checked: false })),
+          BEARISH: state.biasRules.BEARISH.map(r => ({ ...r, checked: false })),
+        },
         currentPsychology: [],
       };
 
@@ -94,8 +165,9 @@ function reducer(state: SabarState, action: Action): SabarState {
 
     case "TAKE_TRADE":
     case "SKIP_TRADE": {
-      const checkedRules = state.rules.filter((r) => r.checked);
-      const missingRules = state.rules.filter((r) => !r.checked);
+      const activeRules = state.biasRules?.[state.currentBias] ?? state.rules;
+      const checkedRules = activeRules.filter((r) => r.checked);
+      const missingRules = activeRules.filter((r) => !r.checked);
       const totalPnl = state.trades.reduce((s, t) => s + (t.pnl ?? 0), 0);
       const currentBalance = state.accountBalance + totalPnl;
       const trade: Trade = {
@@ -106,7 +178,7 @@ function reducer(state: SabarState, action: Action): SabarState {
         bias: state.currentBias,
         psychology: state.currentPsychology,
         rulesChecked: checkedRules.map((r) => r.id),
-        totalRules: state.rules.length,
+        totalRules: activeRules.length,
         checkedCount: checkedRules.length,
         missingRules: missingRules.map((r) => r.id),
         decision: action.type === "TAKE_TRADE" ? "TAKE" : "SKIP",
@@ -122,6 +194,10 @@ function reducer(state: SabarState, action: Action): SabarState {
         ...state,
         trades: [...state.trades, trade],
         rules: state.rules.map((r) => ({ ...r, checked: false })),
+        biasRules: {
+          BULLISH: state.biasRules.BULLISH.map(r => ({ ...r, checked: false })),
+          BEARISH: state.biasRules.BEARISH.map(r => ({ ...r, checked: false })),
+        },
         currentPsychology: [],
       };
     }
@@ -169,8 +245,14 @@ function reducer(state: SabarState, action: Action): SabarState {
         ),
       };
 
-    case "HYDRATE":
-      return { ...state, ...action.payload };
+    case "HYDRATE": {
+      const p = action.payload as Partial<SabarState>;
+      return {
+        ...state,
+        ...p,
+        biasRules: p.biasRules ?? defaultBiasRules,
+      };
+    }
 
     default:
       return state;

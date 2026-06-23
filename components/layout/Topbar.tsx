@@ -2,13 +2,14 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, BarChart2, ScrollText, CalendarDays, Globe, User, Clock, LogOut, ChevronDown, Shield, TrendingUp, BookOpen, Sun, Moon } from "lucide-react";
+import { LayoutDashboard, BarChart2, ScrollText, CalendarDays, Globe, User, Clock, LogOut, ChevronDown, Shield, TrendingUp, BookOpen, Sun, Moon, Target } from "lucide-react";
 import { useAuth } from "@/store/AuthContext";
 
 const navItems = [
   { href: "/",        label: "Dashboard",      icon: LayoutDashboard },
   { href: "/weekly",  label: "Weekly Outlook", icon: TrendingUp       },
   { href: "/journal", label: "Journal",        icon: BookOpen         },
+  { href: "/habits",  label: "Habits",         icon: Target           },
 ];
 
 function LiveClock() {
