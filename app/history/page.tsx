@@ -46,6 +46,7 @@ export default function HistoryPage() {
   const [timeFilter,   setTimeFilter]   = useState("All Time");
   const [selected,     setSelected]     = useState<Trade | null>(null);
   const [editNotes,    setEditNotes]    = useState("");
+  const [editPnl,      setEditPnl]      = useState("");
   const [accounts,     setAccounts]     = useState<Account[]>([]);
   const [tradeLinks,   setTradeLinks]   = useState<Record<string, string>>({});
   const [showLinkDrop, setShowLinkDrop] = useState(false);
@@ -109,7 +110,12 @@ export default function HistoryPage() {
   const skipped     = filtered.filter(t => t.decision === "SKIP").length;
   const aStar       = filtered.filter(t => tradePct(t) >= 90).length;
 
-  const handleSelect = (t: Trade) => { setSelected(t); setEditNotes(t.notes ?? ""); setShowLinkDrop(false); };
+  const handleSelect = (t: Trade) => {
+    setSelected(t);
+    setEditNotes(t.notes ?? "");
+    setEditPnl(t.pnl !== undefined ? String(Math.abs(t.pnl)) : "");
+    setShowLinkDrop(false);
+  };
 
   const setOutcome = (key: string) => {
     if (!selected) return;
@@ -345,22 +351,58 @@ export default function HistoryPage() {
                   )}
                 </div>
 
-                {/* Linked account display */}
+                {/* Linked account display + PnL input */}
                 {tradeLinks[selected.id] && (() => {
                   const acc = accounts.find(a => a.id === tradeLinks[selected.id]);
                   if (!acc) return null;
+                  const isLoss = selected.outcome === "LOSS" || selected.outcome === "WITHDRAW";
+                  const pnlNum = parseFloat(editPnl) || 0;
                   return (
-                    <div className="mt-2 flex items-center justify-between px-3 py-2.5 rounded-lg"
-                      style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
-                      <div className="flex items-center gap-2">
-                        <Link2 size={11} style={{ color: "#E53E3E" }} />
-                        <span className="font-mono text-xs font-bold text-white">{acc.name}</span>
-                        <span className="font-mono text-[10px] text-[#555]">(${(acc.balance ?? 0).toLocaleString()})</span>
+                    <div className="mt-2 space-y-2">
+                      {/* Account row */}
+                      <div className="flex items-center justify-between px-3 py-2 rounded-lg"
+                        style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                        <div className="flex items-center gap-2">
+                          <Link2 size={11} style={{ color: "#E53E3E" }} />
+                          <span className="font-mono text-xs font-bold text-white">{acc.name}</span>
+                          <span className="font-mono text-[9px] text-[#444]">(${(acc.balance ?? 0).toLocaleString()})</span>
+                        </div>
+                        <button onClick={() => unlinkAccount(selected.id)}
+                          className="p-1 rounded transition-colors text-[#333] hover:text-[#FF3B3B]">
+                          <XCircle size={13} />
+                        </button>
                       </div>
-                      <button onClick={() => unlinkAccount(selected.id)}
-                        className="font-mono text-[9px] text-[#333] hover:text-[#FF3B3B] transition-colors">
-                        unlink
-                      </button>
+
+                      {/* PnL input */}
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 relative">
+                          <input
+                            type="number"
+                            value={editPnl}
+                            onChange={e => {
+                              setEditPnl(e.target.value);
+                              const val = parseFloat(e.target.value) || 0;
+                              const signed = (selected.outcome === "LOSS" || selected.outcome === "WITHDRAW") ? -val : val;
+                              dispatch({ type: "UPDATE_TRADE", payload: { id: selected.id, pnl: signed } });
+                              setSelected(prev => prev ? { ...prev, pnl: signed } : null);
+                            }}
+                            placeholder="Enter amount..."
+                            className="w-full px-3 py-2 rounded-lg font-mono text-sm text-white placeholder-[#333] focus:outline-none"
+                            style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }}
+                          />
+                        </div>
+                        {pnlNum > 0 && (
+                          <span className="font-mono text-sm font-bold shrink-0"
+                            style={{ color: isLoss ? "#FF3B3B" : "#00FF7F" }}>
+                            {isLoss ? "-" : "+"}${pnlNum.toLocaleString()}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Hint */}
+                      <p className="font-mono text-[9px] text-[#333] leading-relaxed">
+                        WIN = + (add to balance) · LOSS/WITHDRAW = − (subtract from balance)
+                      </p>
                     </div>
                   );
                 })()}
