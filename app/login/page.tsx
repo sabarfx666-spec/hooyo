@@ -103,6 +103,7 @@ export default function LoginPage() {
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4 overflow-y-auto">
 
       {/* Top nav links */}
@@ -255,5 +256,7 @@ export default function LoginPage() {
         </div>
       </div>
     )}
+    </>
   );
 }
+
