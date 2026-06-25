@@ -43,7 +43,7 @@ export interface Trade {
   pnl?: number;
   notes?: string;
   chartProof?: string;
-  chartProofs?: Partial<Record<"5M" | "15M" | "4H" | "Daily" | "Result", string>>;
+  chartProofs?: Partial<Record<"Weekly" | "Daily" | "4H" | "15M" | "5M" | "Result", string>>;
   imgBefore?: string;
   imgAfter?: string;
 }
