@@ -353,7 +353,7 @@ export default function HistoryPage() {
                       <div className="flex items-center gap-2">
                         <Link2 size={11} style={{ color: "#E53E3E" }} />
                         <span className="font-mono text-xs font-bold text-white">{acc.name}</span>
-                        <span className="font-mono text-[10px] text-[#555]">(${acc.balance.toLocaleString()})</span>
+                        <span className="font-mono text-[10px] text-[#555]">(${(acc.balance ?? 0).toLocaleString()})</span>
                       </div>
                       <button onClick={() => unlinkAccount(selected.id)}
                         className="font-mono text-[9px] text-[#333] hover:text-[#FF3B3B] transition-colors">
