@@ -83,7 +83,7 @@ export type Action =
   | { type: "REORDER_BIAS_RULES"; payload: { bias: Bias; category: "BASIS" | "ENTRY"; fromIndex: number; toIndex: number } }
   | { type: "RESET_CHECKLIST" }
   | { type: "DELETE_TRADE"; payload: string }
-  | { type: "UPDATE_TRADE"; payload: { id: string; outcome?: Trade["outcome"]; notes?: string; chartProof?: string; chartProofs?: Partial<Record<"5M" | "15M" | "4H" | "Daily" | "Result", string>> } }
+  | { type: "UPDATE_TRADE"; payload: { id: string; outcome?: Trade["outcome"]; notes?: string; chartProof?: string; chartProofs?: Trade["chartProofs"] } }
   | { type: "SET_ACCOUNT_BALANCE"; payload: number }
   | { type: "SET_RISK_PERCENT"; payload: number }
   | { type: "HYDRATE"; payload: Partial<SabarState> };
