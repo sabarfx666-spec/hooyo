@@ -5,6 +5,7 @@ import { Trade } from "@/store/types";
 import {
   BookOpen, TrendingUp, TrendingDown, Minus, Search,
   FileText, ArrowLeft, Award, AlertCircle, Brain, XCircle,
+  User, CreditCard,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -109,9 +110,21 @@ export default function HistoryPage() {
             <p className="font-mono text-[10px] text-[#444]">Review your saved trades</p>
           </div>
         </div>
-        <Link href="/" className="flex items-center gap-1.5 text-xs font-mono text-[#444] hover:text-white transition-colors">
-          <ArrowLeft size={13} /> Back to Checklist
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link href="/profile"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition-all hover:opacity-90"
+            style={{ background: "#1A1A1A", border: "1px solid #2A2A2A", color: "#aaa" }}>
+            <User size={13} /> Profile
+          </Link>
+          <Link href="/accounts"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition-all hover:opacity-90"
+            style={{ background: "#1A1A1A", border: "1px solid #2A2A2A", color: "#aaa" }}>
+            <CreditCard size={13} /> Accounts
+          </Link>
+          <Link href="/" className="flex items-center gap-1.5 text-xs font-mono text-[#444] hover:text-white transition-colors ml-2">
+            <ArrowLeft size={13} /> Back to Checklist
+          </Link>
+        </div>
       </div>
 
       {/* Stats */}
