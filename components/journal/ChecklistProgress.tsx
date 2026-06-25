@@ -11,8 +11,9 @@ function getGrade(pct: number) {
 
 export function ChecklistProgress() {
   const { state } = useSabar();
-  const checked = state.rules.filter((r) => r.checked).length;
-  const total   = state.rules.length;
+  const biasSet = state.biasRules?.[state.currentBias] ?? [];
+  const checked = biasSet.filter((r) => r.checked).length;
+  const total   = biasSet.length;
   const pct     = total > 0 ? Math.round((checked / total) * 100) : 0;
   const grade   = getGrade(pct);
 
