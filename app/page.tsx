@@ -6,6 +6,7 @@ import { ChecklistProgress }   from "@/components/journal/ChecklistProgress";
 import { RulesList }           from "@/components/journal/RulesList";
 import { TradeSummary }        from "@/components/journal/TradeSummary";
 import { DailyHeaderStats }    from "@/components/journal/DailyHeaderStats";
+import { ChartSnapshots }      from "@/components/journal/ChartSnapshots";
 export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto space-y-5">
@@ -36,6 +37,11 @@ export default function Dashboard() {
         <div className="anim-fade-up d-500"><RulesList category="BASIS" /></div>
         <div className="anim-fade-up d-600"><RulesList category="ENTRY" /></div>
         <div className="anim-slide-right d-600"><TradeSummary /></div>
+      </div>
+
+      {/* Proof / Chart Snapshots */}
+      <div className="anim-fade-up d-600">
+        <ChartSnapshots />
       </div>
 
     </div>
