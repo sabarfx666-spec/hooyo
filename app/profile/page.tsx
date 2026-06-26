@@ -102,7 +102,7 @@ function TradeCalendar({ trades }: { trades: Trade[] }) {
       {/* Calendar weeks */}
       <div className="space-y-1">
         {weeks.map((week, wi) => {
-          const weekPnl   = week.reduce((s, day) => {
+          const weekPnl   = week.reduce<number>((s, day) => {
             if (!day) return s;
             const key = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
             return s + (dayData[key]?.pnl ?? 0);
