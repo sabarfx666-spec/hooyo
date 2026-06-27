@@ -19,6 +19,7 @@ interface WeeklyEntry {
   dol:         "BSL" | "SSL" | "MIXED" | null;
   imgBefore:   string | null;
   imgAfter:    string | null;
+  imgDaily:    string | null;
   biases:      Record<string, "BULLISH" | "BEARISH" | "NEUTRAL">;
   keyLevels:   string;
   newsEvents:  string;
@@ -30,7 +31,7 @@ interface WeeklyEntry {
 
 const BLANK = (ws: string): WeeklyEntry => ({
   weekStart: ws, bias: null, pair: null, dol: null,
-  imgBefore: null, imgAfter: null, biases: {},
+  imgBefore: null, imgAfter: null, imgDaily: null, biases: {},
   keyLevels: "", newsEvents: "", confluences: "", gamePlan: "", notes: "", done: false,
 });
 
@@ -62,8 +63,9 @@ export default function WeeklyOutlookPage() {
   const [webhookInput, setWebhookInput] = useState("");
   const [webhookSaved, setWebhookSaved] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState(false);
-  const fileRefBefore = useRef<HTMLInputElement>(null);
-  const fileRefAfter  = useRef<HTMLInputElement>(null);
+  const fileRefMonthly = useRef<HTMLInputElement>(null);
+  const fileRefWeekly  = useRef<HTMLInputElement>(null);
+  const fileRefDaily   = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
@@ -89,14 +91,14 @@ export default function WeeklyOutlookPage() {
     localStorage.setItem(SAVED_PAIRS_KEY, JSON.stringify(list));
   }
 
-  function readImg(key: "imgBefore" | "imgAfter", file: File | null | undefined) {
+  function readImg(key: "imgBefore" | "imgAfter" | "imgDaily", file: File | null | undefined) {
     if (!file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = ev => save({ [key]: ev.target?.result as string });
     reader.readAsDataURL(file);
   }
 
-  function onPaste(key: "imgBefore" | "imgAfter") {
+  function onPaste(key: "imgBefore" | "imgAfter" | "imgDaily") {
     return (e: React.ClipboardEvent) => {
       for (const item of Array.from(e.clipboardData.items)) {
         if (item.type.startsWith("image/")) {
@@ -299,41 +301,46 @@ export default function WeeklyOutlookPage() {
             </div>
           </div>
 
-          {/* Chart Screenshots */}
+          {/* Chart Screenshots — Monthly / Weekly / Daily */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
             <div className="flex items-center gap-2">
               <ImageIcon size={13} style={{ color: "#6AECE1" }} />
               <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Chart Screenshots</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               {([
-                { key: "imgBefore" as const, label: "BEFORE", color: "#6AECE1", ref: fileRefBefore },
-                { key: "imgAfter"  as const, label: "AFTER",  color: "#00FF7F", ref: fileRefAfter  },
-              ]).map(({ key, label, color, ref }) => (
+                { key: "imgBefore" as "imgBefore"|"imgAfter"|"imgDaily", label: "MONTHLY", sub: "1M", color: "#F59E0B", ref: fileRefMonthly },
+                { key: "imgAfter"  as "imgBefore"|"imgAfter"|"imgDaily", label: "WEEKLY",  sub: "1W", color: "#6AECE1", ref: fileRefWeekly  },
+                { key: "imgDaily"  as "imgBefore"|"imgAfter"|"imgDaily", label: "DAILY",   sub: "1D", color: "#00FF7F", ref: fileRefDaily   },
+              ]).map(({ key, label, sub, color, ref }) => (
                 <div key={key} className="flex flex-col gap-1.5">
-                  <span className="font-mono text-[9px] font-black uppercase tracking-widest" style={{ color }}>{label}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-mono text-[9px] font-black uppercase tracking-widest" style={{ color }}>{label}</span>
+                    <span className="font-mono text-[8px]" style={{ color: "#333" }}>{sub}</span>
+                  </div>
                   {entry[key] ? (
                     <div className="relative group rounded-lg overflow-hidden" style={{ border: "1px solid #1A1A1A" }}>
-                      <img src={entry[key]!} alt={label} className="w-full object-cover rounded-lg" style={{ maxHeight: 150 }} />
+                      <img src={entry[key]!} alt={label} className="w-full object-cover rounded-lg" style={{ maxHeight: 130 }} />
                       <button onClick={() => save({ [key]: null })}
                         className="absolute top-1.5 right-1.5 p-1 rounded bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#FF3B3B]">
                         <X size={11} />
                       </button>
                     </div>
                   ) : (
-                    <div tabIndex={0} onPaste={onPaste(key)}
+                    <div tabIndex={0}
+                      onPaste={onPaste(key)}
                       onDrop={e => { e.preventDefault(); setDragOver(null); readImg(key, e.dataTransfer.files?.[0]); }}
                       onDragOver={e => { e.preventDefault(); setDragOver(key); }}
                       onDragLeave={() => setDragOver(null)}
                       onClick={() => ref.current?.click()}
-                      className="flex flex-col items-center justify-center gap-1.5 rounded-lg cursor-pointer transition-all py-8 focus:outline-none"
+                      className="flex flex-col items-center justify-center gap-1.5 rounded-lg cursor-pointer transition-all py-6 focus:outline-none"
                       style={{
                         border: `2px dashed ${dragOver === key ? color : "#1A1A1A"}`,
                         background: dragOver === key ? `${color}08` : "#111",
                       }}>
-                      <Upload size={16} style={{ color: "#333" }} />
-                      <span className="font-mono text-[9px] font-bold" style={{ color: "#333" }}>Click or Paste</span>
-                      <span className="font-mono text-[8px]" style={{ color: "#222" }}>Ctrl+V · Drag & Drop</span>
+                      <Upload size={14} style={{ color: "#333" }} />
+                      <span className="font-mono text-[8px] font-bold" style={{ color: "#333" }}>Click or Paste</span>
+                      <span className="font-mono text-[7px]" style={{ color: "#222" }}>Ctrl+V · Drop</span>
                     </div>
                   )}
                   <input ref={ref} type="file" accept="image/*" className="hidden"

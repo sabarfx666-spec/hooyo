@@ -2,6 +2,12 @@
 
 import React, { createContext, useContext, useReducer, useEffect, ReactNode } from "react";
 import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
+import { imgSaveTrade, imgLoadTrade, imgDeleteTrade } from "@/lib/db";
+
+const stripImages = (trade: Trade): Trade => {
+  const { imgBefore, imgAfter, chartProof, chartProofs, ...rest } = trade;
+  return rest as Trade;
+};
 import { defaultPairs, defaultRules, sampleTrades } from "./seedData";
 
 const today = new Date().toISOString().split("T")[0];
@@ -190,6 +196,8 @@ function reducer(state: SabarState, action: Action): SabarState {
         rr: 0,
         ...action.payload,
       };
+      // Save images to IndexedDB (fire-and-forget)
+      imgSaveTrade(trade.id, trade).catch(() => {});
       return {
         ...state,
         trades: [...state.trades, trade],
@@ -232,18 +240,22 @@ function reducer(state: SabarState, action: Action): SabarState {
       };
 
     case "DELETE_TRADE":
+      imgDeleteTrade(action.payload).catch(() => {});
       return {
         ...state,
         trades: state.trades.filter((t) => t.id !== action.payload),
       };
 
-    case "UPDATE_TRADE":
+    case "UPDATE_TRADE": {
+      const updated = action.payload;
+      imgSaveTrade(updated.id, updated).catch(() => {});
       return {
         ...state,
         trades: state.trades.map((t) =>
-          t.id === action.payload.id ? { ...t, ...action.payload } : t
+          t.id === updated.id ? { ...t, ...updated } : t
         ),
       };
+    }
 
     case "HYDRATE": {
       const p = action.payload as Partial<SabarState>;
@@ -269,18 +281,41 @@ const SabarContext = createContext<SabarContextValue | null>(null);
 export function SabarProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Load from localStorage after hydration (avoids SSR mismatch)
+  // Load from localStorage then rehydrate images from IndexedDB
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) dispatch({ type: "HYDRATE", payload: JSON.parse(raw) });
-    } catch {}
+    const load = async () => {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const saved: Partial<SabarState> = JSON.parse(raw);
+        dispatch({ type: "HYDRATE", payload: saved });
+        // Restore images for every trade from IndexedDB
+        if (saved.trades?.length) {
+          await Promise.all(
+            saved.trades.map(async (t) => {
+              const imgs = await imgLoadTrade(t.id);
+              const hasAny = imgs.imgBefore || imgs.imgAfter || imgs.chartProof ||
+                Object.keys(imgs.chartProofs).length > 0;
+              if (hasAny) dispatch({ type: "UPDATE_TRADE", payload: { id: t.id, ...imgs } });
+            })
+          );
+        }
+      } catch {}
+    };
+    load();
   }, []);
 
-  // Save on every state change
+  // Save on every state change — strip images so localStorage stays small
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      const stripped = { ...state, trades: state.trades.map(stripImages) };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(stripped));
+      } catch {
+        // Quota exceeded even without images — save everything except trades
+        const minimal = { ...stripped, trades: [] };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
+      }
     } catch {}
   }, [state]);
 
