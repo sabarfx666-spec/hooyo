@@ -24,10 +24,10 @@ function tradePct(t: Trade) {
   return t.totalRules > 0 ? Math.round((t.checkedCount / t.totalRules) * 100) : 0;
 }
 function gradeInfo(pct: number) {
-  if (pct >= 90) return { letter: "A*", color: "#00FF7F", bg: "rgba(0,255,127,0.12)" };
-  if (pct >= 70) return { letter: "B*", color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
-  if (pct >= 50) return { letter: "C",  color: "#F5A623", bg: "rgba(245,162,35,0.12)" };
-  return              { letter: "D",   color: "#FF3B3B", bg: "rgba(255,59,59,0.12)" };
+  if (pct >= 90) return { letter: "A+", color: "#00FF7F", bg: "rgba(0,255,127,0.12)" };
+  if (pct >= 70) return { letter: "B+", color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
+  if (pct >= 50) return { letter: "C-", color: "#F5A623", bg: "rgba(245,162,35,0.12)" };
+  return              { letter: "D-",  color: "#FF3B3B", bg: "rgba(255,59,59,0.12)" };
 }
 function hasCharts(t: Trade) {
   return t.chartProofs && Object.keys(t.chartProofs).length > 0;

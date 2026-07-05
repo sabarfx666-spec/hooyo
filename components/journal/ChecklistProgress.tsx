@@ -2,10 +2,10 @@
 import { useSabar } from "@/store/SabarContext";
 
 function getGrade(pct: number) {
-  if (pct >= 90) return { letter: "A*", color: "#00FF7F" };
-  if (pct >= 70) return { letter: "B*", color: "#6AECE1" };
-  if (pct >= 50) return { letter: "C",  color: "#F5A623" };
-  return              { letter: "D",  color: "#FF3B3B" };
+  if (pct >= 90) return { letter: "A+", color: "#00FF7F" };
+  if (pct >= 70) return { letter: "B+", color: "#6AECE1" };
+  if (pct >= 50) return { letter: "C-", color: "#F5A623" };
+  return              { letter: "D-", color: "#FF3B3B" };
 }
 
 export function ChecklistProgress() {

@@ -345,10 +345,10 @@ export default function ProfilePage() {
 
   // Grade distribution
   const grades = [
-    { grade: "A*", color: "#00FF7F", bg: "rgba(0,255,127,0.08)", count: state.trades.filter(t => tradePct(t) >= 90).length },
-    { grade: "B*", color: "#6AECE1", bg: "rgba(106,236,225,0.08)", count: state.trades.filter(t => tradePct(t) >= 70 && tradePct(t) < 90).length },
-    { grade: "C",  color: "#F5A623", bg: "rgba(245,162,35,0.08)", count: state.trades.filter(t => tradePct(t) >= 50 && tradePct(t) < 70).length },
-    { grade: "D",  color: "#FF3B3B", bg: "rgba(255,59,59,0.08)", count: state.trades.filter(t => tradePct(t) < 50).length },
+    { grade: "A+", color: "#00FF7F", bg: "rgba(0,255,127,0.08)", count: state.trades.filter(t => tradePct(t) >= 90).length },
+    { grade: "B+", color: "#6AECE1", bg: "rgba(106,236,225,0.08)", count: state.trades.filter(t => tradePct(t) >= 70 && tradePct(t) < 90).length },
+    { grade: "C-", color: "#F5A623", bg: "rgba(245,162,35,0.08)", count: state.trades.filter(t => tradePct(t) >= 50 && tradePct(t) < 70).length },
+    { grade: "D-", color: "#FF3B3B", bg: "rgba(255,59,59,0.08)", count: state.trades.filter(t => tradePct(t) < 50).length },
   ];
 
   const topSession = Object.entries(sessionMap).sort((a, b) => b[1].total - a[1].total)[0]?.[0] ?? "—";

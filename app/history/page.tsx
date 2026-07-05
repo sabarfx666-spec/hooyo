@@ -16,10 +16,10 @@ function tradePct(t: Trade) {
   return t.totalRules > 0 ? Math.round((t.checkedCount / t.totalRules) * 100) : 0;
 }
 function gradeInfo(pct: number) {
-  if (pct >= 90) return { letter: "A*", color: "#00FF7F", bg: "rgba(0,255,127,0.12)" };
-  if (pct >= 70) return { letter: "B*", color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
-  if (pct >= 50) return { letter: "C",  color: "#F5A623", bg: "rgba(245,162,35,0.12)" };
-  return              { letter: "D",   color: "#FF3B3B", bg: "rgba(255,59,59,0.12)" };
+  if (pct >= 90) return { letter: "A+", color: "#00FF7F", bg: "rgba(0,255,127,0.12)" };
+  if (pct >= 70) return { letter: "B+", color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
+  if (pct >= 50) return { letter: "C-", color: "#F5A623", bg: "rgba(245,162,35,0.12)" };
+  return              { letter: "D-",  color: "#FF3B3B", bg: "rgba(255,59,59,0.12)" };
 }
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -169,7 +169,7 @@ export default function HistoryPage() {
           { label: "Total Trades", value: totalTrades, Icon: BookOpen,     color: "#fff" },
           { label: "Taken",        value: taken,       Icon: TrendingUp,   color: "#00FF7F" },
           { label: "Skipped",      value: skipped,     Icon: TrendingDown, color: "#FF3B3B" },
-          { label: "A* Trades",    value: aStar,       Icon: Award,        color: "#F5A623" },
+          { label: "A+ Trades",    value: aStar,       Icon: Award,        color: "#F5A623" },
         ].map(({ label, value, Icon, color }) => (
           <div key={label} className="p-4 rounded-xl" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
             <div className="flex items-center gap-2 mb-2">
@@ -193,7 +193,7 @@ export default function HistoryPage() {
       {/* Dropdowns */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { val: gradeFilter,  set: setGradeFilter,  opts: ["All Grades","A*","B*","C","D"] },
+          { val: gradeFilter,  set: setGradeFilter,  opts: ["All Grades","A+","B+","C-","D-"] },
           { val: statusFilter, set: setStatusFilter,  opts: ["All Status","Taken","Skipped"] },
           { val: pairFilter,   set: setPairFilter,    opts: ["All Pairs", ...pairs] },
         ].map(({ val, set, opts }) => (
