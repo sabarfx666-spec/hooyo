@@ -2,7 +2,7 @@
 import { useState, useRef } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Rule } from "@/store/types";
-import { Plus, Trash2, GripVertical, ChevronRight, CheckCircle2, Circle } from "lucide-react";
+import { Plus, Trash2, GripVertical, ChevronRight, Check, Circle } from "lucide-react";
 
 interface RulesListProps {
   category: "BASIS" | "ENTRY";
@@ -121,7 +121,10 @@ export function RulesList({ category }: RulesListProps) {
                     filter: rule.checked ? `drop-shadow(0 0 6px ${biasColor})` : "none",
                   }}>
                   {rule.checked
-                    ? <CheckCircle2 size={rule.indent ? 18 : 22} strokeWidth={0} fill={biasColor} />
+                    ? <span className="rounded-full flex items-center justify-center"
+                        style={{ width: rule.indent ? 18 : 22, height: rule.indent ? 18 : 22, background: biasColor }}>
+                        <Check size={rule.indent ? 11 : 13} strokeWidth={3.5} color="#FFFFFF" />
+                      </span>
                     : <Circle size={rule.indent ? 18 : 22} strokeWidth={1.5} color="#333" />}
                 </button>
 
