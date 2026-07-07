@@ -5,7 +5,7 @@ import { Trade } from "@/store/types";
 import {
   BookOpen, TrendingUp, TrendingDown, Minus, Search,
   FileText, ArrowLeft, Award, AlertCircle, Brain, XCircle,
-  User, CreditCard, Link2, ChevronDown, Plus,
+  User, CreditCard, Link2, ChevronDown, Plus, Check, X, Clock,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +48,7 @@ export default function HistoryPage() {
   const [editNotes,    setEditNotes]    = useState("");
   const [editPnl,      setEditPnl]      = useState("");
   const [accounts,     setAccounts]     = useState<Account[]>([]);
+  const [showChecklist, setShowChecklist] = useState(false);
   const [tradeLinks,   setTradeLinks]   = useState<Record<string, string>>({});
   const [showLinkDrop, setShowLinkDrop] = useState(false);
 
@@ -115,6 +116,7 @@ export default function HistoryPage() {
     setEditNotes(t.notes ?? "");
     setEditPnl(t.pnl !== undefined ? String(Math.abs(t.pnl)) : "");
     setShowLinkDrop(false);
+    setShowChecklist(false);
   };
 
   const setOutcome = (key: string) => {
@@ -271,27 +273,100 @@ export default function HistoryPage() {
             <div className="rounded-xl p-5 space-y-4" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
 
               {/* Trade header */}
-              <div>
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="font-mono font-black text-white text-lg">{selected.pair}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-bold font-mono"
-                    style={selected.bias === "BEARISH"
-                      ? { background: "rgba(255,59,59,0.12)", color: "#FF6B6B" }
-                      : { background: "rgba(0,255,127,0.1)", color: "#00FF7F" }}>
-                    {selected.bias === "BEARISH" ? "Bearish" : "Bullish"}
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[9px] font-mono"
-                    style={{ background: "#1A1A1A", color: "#666" }}>
-                    {selected.session === "LONDON" ? "London" : "New York"}
-                  </span>
-                  {(() => { const g = gradeInfo(tradePct(selected)); return (
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className="font-mono font-black text-white text-lg">{selected.pair}</span>
                     <span className="px-2 py-0.5 rounded-full text-[9px] font-bold font-mono"
-                      style={{ background: g.bg, color: g.color }}>{g.letter}</span>
-                  ); })()}
+                      style={selected.bias === "BEARISH"
+                        ? { background: "rgba(255,59,59,0.12)", color: "#FF6B6B" }
+                        : { background: "rgba(0,255,127,0.1)", color: "#00FF7F" }}>
+                      {selected.bias === "BEARISH" ? "Bearish" : "Bullish"}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[9px] font-mono"
+                      style={{ background: "#1A1A1A", color: "#666" }}>
+                      {selected.session === "LONDON" ? "London" : "New York"}
+                    </span>
+                  </div>
+                  <p className="font-mono text-[10px] text-[#444]">
+                    {new Date(selected.date).toLocaleDateString("en-US", { weekday:"short", year:"numeric", month:"short", day:"numeric" })}
+                  </p>
                 </div>
-                <p className="font-mono text-[10px] text-[#444]">
-                  {new Date(selected.date).toLocaleDateString("en-US", { weekday:"short", year:"numeric", month:"short", day:"numeric" })}
-                </p>
+                {(() => { const g = gradeInfo(tradePct(selected)); return (
+                  <span className="font-mono font-black text-3xl leading-none shrink-0" style={{ color: g.color }}>{g.letter}</span>
+                ); })()}
+              </div>
+
+              {/* Timestamps */}
+              <div className="rounded-lg px-3 py-2.5 space-y-1" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <Clock size={11} style={{ color: "#666" }} />
+                  <p className="font-mono text-[10px] font-bold text-[#666]">Timestamps</p>
+                </div>
+                {(() => {
+                  const ts = parseInt(selected.id.replace("trade-", ""), 10);
+                  const loggedAt = Number.isFinite(ts) ? new Date(ts).toLocaleString() : null;
+                  return (
+                    <>
+                      <p className="font-mono text-[10px] text-[#888]">
+                        Created: <span className="text-white font-bold">{loggedAt ?? fmtDate(selected.date)}</span>
+                      </p>
+                      <p className="font-mono text-[10px] text-[#888]">
+                        {selected.decision === "SKIP" ? "Skipped at" : "Taken at"}: <span className="text-white font-bold">{loggedAt ?? "—"}</span>
+                      </p>
+                      {selected.decision === "SKIP" && selected.notes && (
+                        <p className="font-mono text-[10px] text-[#888]">
+                          Reason: <span className="text-white italic">{selected.notes}</span>
+                        </p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
+
+              {/* Checklist Analysis — collapsed summary, expands on click */}
+              <div>
+                <button
+                  onClick={() => setShowChecklist(v => !v)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg transition-all"
+                  style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                  <span className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ background: "#6AECE1" }} />
+                    <span className="font-mono text-xs font-bold text-white">Checklist Analysis</span>
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <span className="font-mono text-[10px] font-bold" style={{ color: "#00FF7F" }}>✓ {selected.checkedCount}</span>
+                    <span className="font-mono text-[10px] font-bold" style={{ color: "#FF3B3B" }}>✗ {Math.max(selected.totalRules - selected.checkedCount, 0)}</span>
+                    <ChevronDown size={12} className="transition-transform" style={{ color: "#666", transform: showChecklist ? "rotate(180deg)" : "none" }} />
+                  </span>
+                </button>
+                {showChecklist && (() => {
+                  const ruleMap = new Map<string, string>();
+                  [...(state.biasRules?.[selected.bias] ?? []), ...(state.rules ?? [])].forEach(r => ruleMap.set(r.id, r.label));
+                  const resolve = (id: string) => ruleMap.get(id) ?? id;
+                  const rows = [
+                    ...(selected.rulesChecked ?? []).map(id => ({ label: resolve(id), ok: true })),
+                    ...(selected.missingRules ?? []).map(id => ({ label: resolve(id), ok: false })),
+                  ];
+                  if (rows.length === 0) {
+                    return <p className="mt-1.5 font-mono text-[10px] text-[#333] italic">No checklist data saved for this trade.</p>;
+                  }
+                  return (
+                    <div className="mt-1.5 space-y-1">
+                      {rows.map(({ label, ok }, i) => (
+                        <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+                          style={ok
+                            ? { background: "rgba(0,255,127,0.05)", border: "1px solid rgba(0,255,127,0.12)" }
+                            : { background: "rgba(255,59,59,0.05)", border: "1px solid rgba(255,59,59,0.12)" }}>
+                          {ok
+                            ? <Check size={12} className="shrink-0" style={{ color: "#00FF7F" }} />
+                            : <X size={12} className="shrink-0" style={{ color: "#FF3B3B" }} />}
+                          <span className="font-mono text-[11px]" style={{ color: ok ? "#DDD" : "#777" }}>{label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Trade Outcome */}
