@@ -23,6 +23,14 @@ const TIMEFRAMES: { key: TF; label: string }[] = [
 function tradePct(t: Trade) {
   return t.totalRules > 0 ? Math.round((t.checkedCount / t.totalRules) * 100) : 0;
 }
+function tradeR(t: Trade) {
+  // R = actual PnL divided by the dollar amount risked on the trade
+  if (t.pnl !== undefined && t.riskAmount > 0) return t.pnl / t.riskAmount;
+  return t.rr ?? 0;
+}
+function fmtR(r: number) {
+  return `${r >= 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}R`;
+}
 function gradeInfo(pct: number) {
   if (pct >= 90) return { letter: "A+", color: "#00FF7F", bg: "rgba(0,255,127,0.12)" };
   if (pct >= 70) return { letter: "B+", color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
@@ -108,7 +116,7 @@ function ChartPanel({ trade, onClose }: { trade: Trade; onClose: () => void }) {
       <div className="px-5 py-3 border-b grid grid-cols-2 gap-2" style={{ borderColor: "#1A1A1A" }}>
         {[
           { label: "Outcome", value: trade.outcome ?? "—", color: trade.outcome === "WIN" ? "#00FF7F" : trade.outcome === "LOSS" ? "#FF3B3B" : "#6AECE1" },
-          { label: "RR Result", value: trade.rr ? `+${trade.rr}R` : "—", color: "#6AECE1" },
+          { label: "RR Result", value: tradeR(trade) !== 0 ? fmtR(tradeR(trade)) : "—", color: tradeR(trade) >= 0 ? "#6AECE1" : "#FF3B3B" },
           { label: "Grade", value: g.letter, color: g.color },
           { label: "Status", value: trade.decision === "TAKE" ? "Taken" : "Skipped", color: "#fff" },
         ].map(({ label, value, color }) => (
@@ -261,7 +269,7 @@ export default function AccountsPage() {
   }, [state.trades, account]);
 
   const totalPnl   = linkedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const totalR     = linkedTrades.reduce((s, t) => s + (t.rr ?? 0), 0);
+  const totalR     = linkedTrades.reduce((s, t) => s + tradeR(t), 0);
   const totalPages = Math.max(1, Math.ceil(linkedTrades.length / rowsPerPage));
   const safePage   = Math.min(page, totalPages);
   const pageStart  = (safePage - 1) * rowsPerPage;
@@ -392,9 +400,9 @@ export default function AccountsPage() {
                               <Camera size={13} style={{ color: hasImg ? "#E53E3E" : "#333" }} />
                             </button>
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs" style={{ color: "#6AECE1" }}>+{t.rr}R</td>
-                          <td className="px-4 py-3 font-mono text-xs font-bold" style={{ color: "#00FF7F" }}>
-                            {t.pnl !== undefined ? `+$${t.pnl.toLocaleString()}` : "—"}
+                          <td className="px-4 py-3 font-mono text-xs" style={{ color: tradeR(t) >= 0 ? "#6AECE1" : "#FF3B3B" }}>{fmtR(tradeR(t))}</td>
+                          <td className="px-4 py-3 font-mono text-xs font-bold" style={{ color: (t.pnl ?? 0) >= 0 ? "#00FF7F" : "#FF3B3B" }}>
+                            {t.pnl !== undefined ? `${t.pnl >= 0 ? "+" : "−"}$${Math.abs(t.pnl).toLocaleString()}` : "—"}
                           </td>
                           <td className="pr-4 py-3">
                             <button onClick={() => setChartTrade(isOpen ? null : t)}

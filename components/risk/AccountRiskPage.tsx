@@ -24,11 +24,14 @@ function fmtPnl(v: number | undefined) {
   const abs = Math.abs(v).toFixed(0);
   return (v >= 0 ? "+" : "−") + "$" + Number(abs).toLocaleString();
 }
-function fmtR(riskPct: number, outcome: string | undefined, rr: number) {
-  if (!outcome || outcome === "BE") return "+0.0%R";
-  const sign = outcome === "WIN" ? "+" : "−";
-  const val  = (riskPct * rr).toFixed(1);
-  return `${sign}${val}%R`;
+function tradeR(t: { pnl?: number; riskAmount: number; riskPercent: number; rr: number; outcome?: string }) {
+  // R = actual PnL divided by the dollar amount risked on the trade
+  if (t.pnl !== undefined && t.riskAmount > 0) return t.pnl / t.riskAmount;
+  if (!t.outcome || t.outcome === "BE") return 0;
+  return t.outcome === "WIN" ? t.riskPercent * t.rr : -t.riskPercent;
+}
+function fmtR(r: number) {
+  return `${r >= 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}R`;
 }
 
 const ROWS_OPTIONS = [5, 10, 25];
@@ -84,10 +87,7 @@ export function AccountRiskPage() {
   /* stats from all TAKE trades */
   const takeTrades = state.trades.filter(t => t.decision === "TAKE");
   const totalPnl   = takeTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const totalR     = takeTrades.reduce((s, t) => {
-    if (!t.outcome || t.outcome === "BE") return s;
-    return s + (t.outcome === "WIN" ? t.riskPercent * t.rr : -t.riskPercent);
-  }, 0);
+  const totalR     = takeTrades.reduce((s, t) => s + tradeR(t), 0);
   const currentBal = (selAccount?.balance ?? state.accountBalance) + totalPnl;
 
   /* history table (all TAKE trades) */
@@ -200,7 +200,7 @@ export function AccountRiskPage() {
         <div className="rounded-xl p-4" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
           <p className="text-xs text-[#666] font-sans mb-2">Total R</p>
           <p className="font-mono font-bold text-2xl" style={{ color: totalR >= 0 ? "#00FF7F" : "#FF3B3B" }}>
-            {totalR >= 0 ? "+" : "−"}{Math.abs(totalR).toFixed(1)}%R
+            {totalR >= 0 ? "+" : "−"}{Math.abs(totalR).toFixed(1)}R
           </p>
         </div>
 
@@ -268,8 +268,9 @@ export function AccountRiskPage() {
             const pct   = trade.totalRules > 0 ? Math.round(trade.checkedCount / trade.totalRules * 100) : 0;
             const grade = getGrade(pct);
             const missing = trade.totalRules - trade.checkedCount;
-            const rrStr = fmtR(trade.riskPercent, trade.outcome, trade.rr);
-            const rrPos = rrStr.startsWith("+");
+            const rVal  = tradeR(trade);
+            const rrStr = fmtR(rVal);
+            const rrPos = rVal >= 0;
             const pnlVal = trade.pnl ?? 0;
 
             return (
