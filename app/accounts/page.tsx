@@ -7,6 +7,7 @@ import {
   Link2, Camera, X, Upload, ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
+import { VoiceMic, appendNote } from "@/components/VoiceMic";
 
 type TF = "Weekly" | "Daily" | "4H" | "15M" | "5M" | "Result";
 type Account = { id: string; name: string; balance: number };
@@ -194,6 +195,10 @@ function ChartPanel({ trade, onClose }: { trade: Trade; onClose: () => void }) {
           onChange={e => { const f = e.target.files?.[0]; if (f) loadFile(f); e.target.value = ""; }} />
 
         {/* Per-tf note */}
+        <div className="flex items-center justify-between mt-2 mb-1">
+          <p className="font-mono text-[9px] uppercase tracking-widest" style={{ color: "#444" }}>Note · {activeTf}</p>
+          <VoiceMic onText={t => setTfNotes(p => ({ ...p, [activeTf]: appendNote(p[activeTf], t) }))} />
+        </div>
         <textarea
           value={tfNotes[activeTf] ?? ""}
           onChange={e => setTfNotes(p => ({ ...p, [activeTf]: e.target.value }))}

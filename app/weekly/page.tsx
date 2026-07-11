@@ -5,6 +5,7 @@ import {
   Upload, X, Image as ImageIcon, FileText, Check, Send, Settings,
 } from "lucide-react";
 import { NewsAlarms } from "@/components/journal/NewsAlarms";
+import { VoiceMic, appendNote } from "@/components/VoiceMic";
 import { imgSave, imgLoad } from "@/lib/db";
 
 const WEEKLY_KEY    = "sabar-weekly-outlook";
@@ -386,9 +387,12 @@ export default function WeeklyOutlookPage() {
 
           {/* Notes */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center gap-2">
-              <FileText size={13} style={{ color: "#F59E0B" }} />
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Weekly Notes</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FileText size={13} style={{ color: "#F59E0B" }} />
+                <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Weekly Notes</p>
+              </div>
+              <VoiceMic onText={t => save({ notes: appendNote(entry.notes, t) })} />
             </div>
             <textarea value={entry.notes} onChange={e => save({ notes: e.target.value })}
               placeholder="Overall narrative, expectations, what to look for this week..."
@@ -402,7 +406,10 @@ export default function WeeklyOutlookPage() {
 
           {/* Key Levels */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Key Levels</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Key Levels</p>
+              <VoiceMic onText={t => save({ keyLevels: appendNote(entry.keyLevels, t) })} />
+            </div>
             <textarea value={entry.keyLevels} onChange={e => save({ keyLevels: e.target.value })}
               placeholder="Support & resistance levels to watch this week..."
               rows={4}
@@ -411,7 +418,10 @@ export default function WeeklyOutlookPage() {
 
           {/* News Events */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#FF3B3B" }}>News Events</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#FF3B3B" }}>News Events</p>
+              <VoiceMic onText={t => save({ newsEvents: appendNote(entry.newsEvents, t) })} />
+            </div>
             <textarea value={entry.newsEvents} onChange={e => save({ newsEvents: e.target.value })}
               placeholder="High impact news: FOMC, NFP, CPI — dates & times..."
               rows={4}
@@ -420,7 +430,10 @@ export default function WeeklyOutlookPage() {
 
           {/* Confluences */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Confluences</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Confluences</p>
+              <VoiceMic onText={t => save({ confluences: appendNote(entry.confluences, t) })} />
+            </div>
             <textarea value={entry.confluences} onChange={e => save({ confluences: e.target.value })}
               placeholder="Technical confluences, ICT concepts, structure..."
               rows={4}
@@ -429,7 +442,10 @@ export default function WeeklyOutlookPage() {
 
           {/* Game Plan */}
           <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#00FF7F" }}>Weekly Game Plan</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#00FF7F" }}>Weekly Game Plan</p>
+              <VoiceMic onText={t => save({ gamePlan: appendNote(entry.gamePlan, t) })} />
+            </div>
             <textarea value={entry.gamePlan} onChange={e => save({ gamePlan: e.target.value })}
               placeholder="Full weekly game plan — setups to watch, rules, risk limits..."
               rows={5}

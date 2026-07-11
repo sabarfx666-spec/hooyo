@@ -8,6 +8,7 @@ import {
   User, CreditCard, Link2, ChevronDown, Plus, Check, X, Clock,
 } from "lucide-react";
 import Link from "next/link";
+import { VoiceMic, appendNote } from "@/components/VoiceMic";
 
 type Account = { id: string; name: string; balance: number };
 
@@ -486,9 +487,12 @@ export default function HistoryPage() {
 
               {/* Trade Notes */}
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="w-2 h-2 rounded-full bg-[#F5A623]" />
-                  <p className="font-mono text-xs font-bold text-white">Trade Notes & Lessons</p>
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-[#F5A623]" />
+                    <p className="font-mono text-xs font-bold text-white">Trade Notes & Lessons</p>
+                  </div>
+                  <VoiceMic onText={t => setEditNotes(p => appendNote(p, t))} />
                 </div>
                 <textarea value={editNotes} onChange={e => setEditNotes(e.target.value)}
                   placeholder="Mistake made, lesson learned, market condition, psychology notes..."
