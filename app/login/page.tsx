@@ -49,10 +49,10 @@ export default function LoginPage() {
 
       let err: string | null;
       if (tab === "login") {
-        err = login(email, password);
+        err = await login(email, password);
       } else {
         if (!name.trim()) { setError("Please enter your name."); return; }
-        err = signup(name.trim(), email, password);
+        err = await signup(name.trim(), email, password);
       }
 
       if (err === "PENDING_APPROVAL") {

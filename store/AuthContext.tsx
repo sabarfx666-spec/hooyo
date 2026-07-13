@@ -1,5 +1,6 @@
 "use client";
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { getSupabase } from "@/lib/supabase";
 
 export interface AuthUser {
   email: string;
@@ -27,8 +28,8 @@ export const NOTIFY_EMAIL_TO_KEY      = "sabar-notify-email-to";
 interface AuthContextValue {
   user:        AuthUser | null;
   hydrated:    boolean;
-  login:       (email: string, password: string) => string | null;
-  signup:      (name: string, email: string, password: string) => string | null;
+  login:       (email: string, password: string) => Promise<string | null>;
+  signup:      (name: string, email: string, password: string) => Promise<string | null>;
   logout:      () => void;
   getAllUsers:  () => StoredAccount[];
   approveUser: (email: string) => void;
@@ -106,6 +107,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [hydrated, setHydrated] = useState(false);
 
   useEffect(() => {
+    // Cloud mode: restore session from Supabase and follow auth changes
+    const sb = getSupabase();
+    if (sb) {
+      sb.auth.getSession().then(({ data }) => {
+        const su = data.session?.user;
+        if (su) {
+          setUser({
+            email: su.email ?? "",
+            name:  (su.user_metadata?.name as string) ?? su.email?.split("@")[0] ?? "Trader",
+            role:  "admin",
+          });
+        }
+        setHydrated(true);
+      });
+      const { data: sub } = sb.auth.onAuthStateChange((_event, session) => {
+        const su = session?.user;
+        setUser(su ? {
+          email: su.email ?? "",
+          name:  (su.user_metadata?.name as string) ?? su.email?.split("@")[0] ?? "Trader",
+          role:  "admin",
+        } : null);
+      });
+      return () => sub.subscription.unsubscribe();
+    }
+
     // Migrate old accounts without role/approved fields
     const raw = localStorage.getItem(ACCOUNTS_KEY);
     if (raw) {
@@ -153,7 +179,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(ACCOUNTS_KEY, JSON.stringify(accounts));
   }
 
-  function login(email: string, password: string): string | null {
+  async function login(email: string, password: string): Promise<string | null> {
+    const sb = getSupabase();
+    if (sb) {
+      const { data, error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) {
+        if (error.message.includes("Invalid login credentials")) return "Wrong email or password.";
+        if (error.message.includes("Email not confirmed")) return "Check your email inbox and confirm your account first.";
+        return error.message;
+      }
+      const su = data.user;
+      if (su) setUser({
+        email: su.email ?? email,
+        name:  (su.user_metadata?.name as string) ?? email.split("@")[0],
+        role:  "admin",
+      });
+      return null;
+    }
     const accounts = getAccounts();
     const found = accounts.find(a => a.email?.toLowerCase() === email.toLowerCase());
     if (!found) return "No account found with that email.";
@@ -165,7 +207,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
-  function signup(name: string, email: string, password: string): string | null {
+  async function signup(name: string, email: string, password: string): Promise<string | null> {
+    const sb = getSupabase();
+    if (sb) {
+      const { data, error } = await sb.auth.signUp({
+        email, password,
+        options: { data: { name } },
+      });
+      if (error) {
+        if (error.message.includes("already registered")) return "An account with this email already exists.";
+        return error.message;
+      }
+      if (data.session) {
+        // Email confirmation disabled — logged in right away
+        const su = data.session.user;
+        setUser({ email: su.email ?? email, name, role: "admin" });
+        return null;
+      }
+      return "Account created! Check your email inbox and click the confirmation link, then log in.";
+    }
     const accounts = getAccounts();
     if (accounts.find(a => a.email?.toLowerCase() === email.toLowerCase())) {
       return "An account with this email already exists.";
@@ -192,6 +252,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function logout() {
+    const sb = getSupabase();
+    if (sb) sb.auth.signOut();
     localStorage.removeItem(SESSION_KEY);
     setUser(null);
   }

@@ -1,8 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from "react";
 import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
 import { imgSaveTrade, imgLoadTrade, imgDeleteTrade } from "@/lib/db";
+import { cloudEnabled } from "@/lib/supabase";
+import { cloudPull, cloudPush, applyExtras } from "@/lib/cloudSync";
+import { useAuth } from "./AuthContext";
 
 const stripImages = (trade: Trade): Trade => {
   const { imgBefore, imgAfter, chartProof, chartProofs, ...rest } = trade;
@@ -318,6 +321,55 @@ export function SabarProvider({ children }: { children: ReactNode }) {
       }
     } catch {}
   }, [state]);
+
+  // ── Cloud sync (Supabase) ──────────────────────────────────
+  const { user, hydrated } = useAuth();
+  const cloudReady = useRef(false);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // On login: pull the cloud journal; first login uploads this device's data instead
+  useEffect(() => {
+    if (!cloudEnabled() || !hydrated || !user) { cloudReady.current = false; return; }
+    let cancelled = false;
+    (async () => {
+      const cloud = await cloudPull();
+      if (cancelled) return;
+      if (cloud?.state) {
+        applyExtras(cloud.extras);
+        dispatch({ type: "HYDRATE", payload: cloud.state });
+        // Restore any locally-stored images for the cloud trades
+        for (const t of cloud.state.trades ?? []) {
+          imgLoadTrade(t.id).then(imgs => {
+            const hasAny = imgs.imgBefore || imgs.imgAfter || imgs.chartProof ||
+              Object.keys(imgs.chartProofs).length > 0;
+            if (hasAny && !cancelled) dispatch({ type: "UPDATE_TRADE", payload: { id: t.id, ...imgs } });
+          }).catch(() => {});
+        }
+      } else {
+        // No cloud data yet — migrate this device's journal up
+        await cloudPush(stateRef.current);
+      }
+      cloudReady.current = true;
+    })();
+    return () => { cancelled = true; };
+  }, [hydrated, user]);
+
+  // Push state changes to the cloud (debounced)
+  useEffect(() => {
+    if (!cloudReady.current) return;
+    const t = setTimeout(() => { cloudPush(stateRef.current); }, 2000);
+    return () => clearTimeout(t);
+  }, [state]);
+
+  // Periodic push catches changes made outside React state (weekly notes, accounts, habits…)
+  useEffect(() => {
+    if (!cloudEnabled()) return;
+    const iv = setInterval(() => {
+      if (cloudReady.current) cloudPush(stateRef.current);
+    }, 20000);
+    return () => clearInterval(iv);
+  }, []);
 
   return (
     <SabarContext.Provider value={{ state, dispatch }}>
