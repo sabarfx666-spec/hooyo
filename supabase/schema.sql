@@ -39,3 +39,29 @@ create policy "own charts update" on storage.objects for update to authenticated
 drop policy if exists "own charts delete" on storage.objects;
 create policy "own charts delete" on storage.objects for delete to authenticated
   using (bucket_id = 'charts' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ── Public copies of charts for Notion ─────────────────────────
+-- Notion can only display images from a public URL. Charts synced to
+-- Notion are published into this public bucket under an unguessable
+-- per-user path; only the owner can write there.
+
+insert into storage.buckets (id, name, public)
+values ('charts-public', 'charts-public', true)
+on conflict (id) do nothing;
+
+drop policy if exists "public charts read" on storage.objects;
+create policy "public charts read" on storage.objects for select
+  using (bucket_id = 'charts-public');
+
+drop policy if exists "own public charts insert" on storage.objects;
+create policy "own public charts insert" on storage.objects for insert to authenticated
+  with check (bucket_id = 'charts-public' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "own public charts update" on storage.objects;
+create policy "own public charts update" on storage.objects for update to authenticated
+  using (bucket_id = 'charts-public' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'charts-public' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "own public charts delete" on storage.objects;
+create policy "own public charts delete" on storage.objects for delete to authenticated
+  using (bucket_id = 'charts-public' and (storage.foldername(name))[1] = auth.uid()::text);

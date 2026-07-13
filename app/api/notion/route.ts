@@ -20,6 +20,7 @@ interface NotionRow {
   grade: string;
   checklist: string;
   notes: string;
+  images?: { name: string; url: string }[];
 }
 
 async function notion(token: string, path: string, method: string, body?: unknown) {
@@ -62,6 +63,11 @@ function tradeProperties(t: NotionRow) {
     Checklist: { rich_text: rt(t.checklist) },
     Notes:     { rich_text: rt(t.notes) },
     TradeID:   { rich_text: rt(t.id) },
+    Charts:    { files: (t.images ?? []).slice(0, 20).map(i => ({
+      name: (i.name || "chart").slice(0, 90),
+      type: "external",
+      external: { url: i.url },
+    })) },
   };
 }
 
@@ -89,6 +95,7 @@ export async function POST(req: NextRequest) {
           Checklist: { rich_text: {} },
           Notes:     { rich_text: {} },
           TradeID:   { rich_text: {} },
+          Charts:    { files: {} },
         },
       });
       return NextResponse.json({ databaseId: (db as { id: string }).id });
@@ -98,6 +105,11 @@ export async function POST(req: NextRequest) {
       const databaseId: string = body.databaseId;
       const rows: NotionRow[] = body.trades ?? [];
       if (!databaseId) return NextResponse.json({ error: "Not connected yet" }, { status: 400 });
+
+      // Databases created before the Charts column existed get it added here
+      try {
+        await notion(token, `/databases/${databaseId}`, "PATCH", { properties: { Charts: { files: {} } } });
+      } catch {}
 
       let created = 0, updated = 0;
       for (const t of rows) {
