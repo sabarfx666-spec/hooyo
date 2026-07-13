@@ -5,6 +5,7 @@ import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
 import { imgSaveTrade, imgLoadTrade, imgDeleteTrade } from "@/lib/db";
 import { cloudEnabled } from "@/lib/supabase";
 import { cloudPull, cloudPush, applyExtras } from "@/lib/cloudSync";
+import { notionConnected, notionSyncTrades } from "@/lib/notionSync";
 import { useAuth } from "./AuthContext";
 
 const stripImages = (trade: Trade): Trade => {
@@ -370,6 +371,17 @@ export function SabarProvider({ children }: { children: ReactNode }) {
     }, 20000);
     return () => clearInterval(iv);
   }, []);
+
+  // Auto-sync trades to Notion (when connected) a few seconds after they change
+  const tradesJson = JSON.stringify(state.trades.map(t => stripImages(t)));
+  useEffect(() => {
+    if (!notionConnected()) return;
+    const t = setTimeout(() => {
+      notionSyncTrades(stateRef.current).catch(() => {});
+    }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradesJson]);
 
   return (
     <SabarContext.Provider value={{ state, dispatch }}>
