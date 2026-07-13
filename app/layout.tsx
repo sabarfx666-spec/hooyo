@@ -6,6 +6,7 @@ import { AuthProvider } from "@/store/AuthContext";
 import { Topbar } from "@/components/layout/Topbar";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { PositionCalculator } from "@/components/journal/PositionCalculator";
+import { CloudStatus } from "@/components/layout/CloudStatus";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <main className="flex-1 p-4 md:p-6 overflow-auto">
                 {children}
               </main>
+              <CloudStatus />
             </AuthGuard>
             </div>
           </div>

@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from "react";
 import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
-import { imgSaveTrade, imgLoadTrade, imgDeleteTrade } from "@/lib/db";
+import { imgSaveTrade, imgLoadTrade, imgDeleteTrade, imgSyncAllToCloud } from "@/lib/db";
 import { cloudEnabled } from "@/lib/supabase";
 import { cloudPull, cloudPush, applyExtras } from "@/lib/cloudSync";
 import { notionConnected, notionSyncTrades } from "@/lib/notionSync";
@@ -352,6 +352,8 @@ export function SabarProvider({ children }: { children: ReactNode }) {
         await cloudPush(stateRef.current);
       }
       cloudReady.current = true;
+      // Safety sweep: upload any local image the cloud doesn't have yet
+      imgSyncAllToCloud().catch(() => {});
     })();
     return () => { cancelled = true; };
   }, [hydrated, user]);
