@@ -1,7 +1,13 @@
-// IndexedDB helper — chart images stored here, never in localStorage.
+// IndexedDB helper — chart images cached here, never in localStorage.
+// Images are ALSO synced to Supabase Storage (bucket "charts") when the
+// user is logged in, so they follow the account across devices and
+// survive the browser's site data being cleared.
+
+import { getSupabase } from "./supabase";
 
 const DB_NAME  = 'sabar_db';
 const IMG_STORE = 'images';
+const BUCKET = 'charts';
 
 let _db: IDBDatabase | null = null;
 
@@ -15,9 +21,59 @@ const getDB = (): Promise<IDBDatabase> => {
   });
 };
 
+// ── Cloud layer (Supabase Storage) ─────────────────────────────
+// Each image is stored as a text object holding its data-URL, at
+// charts/<user-id>/<key>.txt — RLS policies keep it private per user.
+
+const cloudMissing = new Set<string>(); // known-absent keys, skip repeat downloads
+
+const cloudPath = async (key: string): Promise<string | null> => {
+  const sb = getSupabase();
+  if (!sb) return null;
+  const { data } = await sb.auth.getSession();
+  const uid = data.session?.user.id;
+  return uid ? `${uid}/${key}.txt` : null;
+};
+
+const cloudUpload = async (key: string, val: string): Promise<void> => {
+  try {
+    const sb = getSupabase();
+    const path = await cloudPath(key);
+    if (!sb || !path) return;
+    await sb.storage.from(BUCKET).upload(path, new Blob([val], { type: 'text/plain' }), { upsert: true });
+    cloudMissing.delete(key);
+  } catch {}
+};
+
+const cloudDownload = async (key: string): Promise<string | null> => {
+  try {
+    if (cloudMissing.has(key)) return null;
+    const sb = getSupabase();
+    const path = await cloudPath(key);
+    if (!sb || !path) return null;
+    const { data, error } = await sb.storage.from(BUCKET).download(path);
+    if (error || !data) { cloudMissing.add(key); return null; }
+    return await data.text();
+  } catch { return null; }
+};
+
+const cloudRemove = async (keys: string[]): Promise<void> => {
+  try {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data } = await sb.auth.getSession();
+    const uid = data.session?.user.id;
+    if (!uid) return;
+    await sb.storage.from(BUCKET).remove(keys.map(k => `${uid}/${k}.txt`));
+  } catch {}
+};
+
+// ── Local layer (IndexedDB) with cloud sync ────────────────────
+
 export const imgSave = async (key: string, val: string | null | undefined): Promise<void> => {
   if (!val) return;
   const db = await getDB();
+  cloudUpload(key, val); // fire-and-forget so the UI never waits on the network
   return new Promise((res, rej) => {
     const tx = db.transaction(IMG_STORE, 'readwrite');
     tx.objectStore(IMG_STORE).put(val, key);
@@ -28,16 +84,27 @@ export const imgSave = async (key: string, val: string | null | undefined): Prom
 
 export const imgLoad = async (key: string): Promise<string | null> => {
   const db = await getDB();
-  return new Promise((res, rej) => {
+  const local = await new Promise<string | null>((res, rej) => {
     const tx  = db.transaction(IMG_STORE, 'readonly');
     const req = tx.objectStore(IMG_STORE).get(key);
     req.onsuccess = () => res((req.result as string | undefined) ?? null);
     req.onerror   = () => rej(req.error);
   });
+  if (local) return local;
+  // Not on this device — try the cloud, then cache locally for next time
+  const remote = await cloudDownload(key);
+  if (remote) {
+    try {
+      const tx = db.transaction(IMG_STORE, 'readwrite');
+      tx.objectStore(IMG_STORE).put(remote, key);
+    } catch {}
+  }
+  return remote;
 };
 
 export const imgDelete = async (...keys: string[]): Promise<void> => {
   const db = await getDB();
+  cloudRemove(keys);
   const tx = db.transaction(IMG_STORE, 'readwrite');
   const store = tx.objectStore(IMG_STORE);
   keys.forEach(k => store.delete(k));
