@@ -22,6 +22,8 @@ const EXTRA_KEYS = [
   "sabar-notify-email-template",
   "sabar-notify-email-pubkey",
   "sabar-notify-email-to",
+  "sabar-notion-token",
+  "sabar-notion-db",
 ];
 
 export interface CloudData {

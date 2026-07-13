@@ -78,3 +78,48 @@ export function buildNotionMarkdown(state: SabarState): string {
   lines.push(`*Chart images are not included in this export — view them in the Sabar app.*`);
   return lines.join("\n");
 }
+
+// ── Rows for the automatic Notion database sync ────────────────
+
+export interface NotionRow {
+  id: string;
+  date: string;
+  pair: string;
+  session: string;
+  bias: string;
+  decision: string;
+  outcome: string;
+  r: number;
+  pnl: number;
+  grade: string;
+  checklist: string;
+  notes: string;
+}
+
+export function buildNotionRows(state: SabarState): NotionRow[] {
+  const ruleMap = new Map<string, string>();
+  [
+    ...(state.rules ?? []),
+    ...(state.biasRules?.BULLISH ?? []),
+    ...(state.biasRules?.BEARISH ?? []),
+  ].forEach(r => ruleMap.set(r.id, r.label));
+  const resolve = (id: string) => ruleMap.get(id) ?? id;
+
+  return state.trades.map(t => ({
+    id: t.id,
+    date: t.date,
+    pair: t.pair,
+    session: t.session === "LONDON" ? "London" : "New York",
+    bias: t.bias,
+    decision: t.decision,
+    outcome: t.outcome ?? "",
+    r: t.outcome === "WIN" ? (t.rr ?? 0) : t.outcome === "LOSS" ? -(t.rr ?? 0) : 0,
+    pnl: t.pnl ?? 0,
+    grade: gradeOf(t),
+    checklist: [
+      ...(t.rulesChecked ?? []).map(id => `✓ ${resolve(id)}`),
+      ...(t.missingRules ?? []).map(id => `✗ ${resolve(id)}`),
+    ].join("  ·  "),
+    notes: t.notes ?? "",
+  }));
+}

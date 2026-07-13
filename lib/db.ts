@@ -27,6 +27,10 @@ const getDB = (): Promise<IDBDatabase> => {
 
 const cloudMissing = new Set<string>(); // known-absent keys, skip repeat downloads
 
+let pendingUploads = 0;
+/** Number of image uploads still in flight — used to warn before leaving the page. */
+export const imgPendingUploads = (): number => pendingUploads;
+
 const cloudPath = async (key: string): Promise<string | null> => {
   const sb = getSupabase();
   if (!sb) return null;
@@ -36,13 +40,16 @@ const cloudPath = async (key: string): Promise<string | null> => {
 };
 
 const cloudUpload = async (key: string, val: string): Promise<void> => {
+  pendingUploads++;
   try {
     const sb = getSupabase();
     const path = await cloudPath(key);
     if (!sb || !path) return;
     await sb.storage.from(BUCKET).upload(path, new Blob([val], { type: 'text/plain' }), { upsert: true });
     cloudMissing.delete(key);
-  } catch {}
+  } catch {} finally {
+    pendingUploads--;
+  }
 };
 
 const cloudDownload = async (key: string): Promise<string | null> => {
@@ -154,3 +161,35 @@ export const imgDeleteTrade = (tradeId: string): Promise<void> =>
     `${tradeId}_proof`,
     ...PROOF_SLOTS.map(s => `${tradeId}_${s}`)
   );
+
+/**
+ * Safety sweep, run after login: uploads any image that exists locally but
+ * not in the cloud (catches uploads that were interrupted mid-flight).
+ */
+export const imgSyncAllToCloud = async (): Promise<void> => {
+  try {
+    const sb = getSupabase();
+    if (!sb) return;
+    const { data: s } = await sb.auth.getSession();
+    const userId = s.session?.user.id;
+    if (!userId) return;
+
+    const db = await getDB();
+    const keys = await new Promise<string[]>((res, rej) => {
+      const tx  = db.transaction(IMG_STORE, 'readonly');
+      const req = tx.objectStore(IMG_STORE).getAllKeys();
+      req.onsuccess = () => res((req.result as string[]) ?? []);
+      req.onerror   = () => rej(req.error);
+    });
+    if (keys.length === 0) return;
+
+    const { data: existing } = await sb.storage.from(BUCKET).list(userId, { limit: 1000 });
+    const have = new Set((existing ?? []).map(f => f.name));
+
+    for (const k of keys) {
+      if (have.has(`${k}.txt`)) continue;
+      const val = await imgLoad(k);
+      if (val) await cloudUpload(k, val);
+    }
+  } catch {}
+};
