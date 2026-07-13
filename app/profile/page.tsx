@@ -2,9 +2,10 @@
 import { useMemo, useState } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
-import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/store/AuthContext";
+import { buildNotionMarkdown } from "@/lib/notionExport";
 
 function fmt(n: number) {
   const abs = Math.abs(n);
@@ -271,6 +272,17 @@ function OutcomeDonut({ wins, losses, bes }: { wins: number; losses: number; bes
 export default function ProfilePage() {
   const { state } = useSabar();
   const { user } = useAuth();
+  const [copiedNotion, setCopiedNotion] = useState(false);
+
+  const copyForNotion = async () => {
+    try {
+      await navigator.clipboard.writeText(buildNotionMarkdown(state));
+      setCopiedNotion(true);
+      setTimeout(() => setCopiedNotion(false), 2500);
+    } catch {
+      alert("Could not copy — please allow clipboard access and try again.");
+    }
+  };
 
   const taken = useMemo(() => state.trades.filter(t => t.decision === "TAKE"), [state.trades]);
   const wins   = taken.filter(t => t.outcome === "WIN");
@@ -368,6 +380,14 @@ export default function ProfilePage() {
           <Link href="/accounts" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs text-[#555] hover:text-white hover:bg-white/5 transition-all">
             <Layers size={12} /> Accounts
           </Link>
+          <button onClick={copyForNotion}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs transition-all"
+            style={copiedNotion
+              ? { background: "rgba(0,255,127,0.12)", color: "#00FF7F", border: "1px solid rgba(0,255,127,0.3)" }
+              : { background: "rgba(229,62,62,0.12)", color: "#E53E3E", border: "1px solid rgba(229,62,62,0.3)" }}>
+            {copiedNotion ? <Check size={12} /> : <ClipboardCopy size={12} />}
+            {copiedNotion ? "Copied! Paste in Notion" : "Copy for Notion"}
+          </button>
         </div>
       </div>
 
