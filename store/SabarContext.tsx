@@ -267,6 +267,8 @@ function reducer(state: SabarState, action: Action): SabarState {
         ...state,
         ...p,
         biasRules: p.biasRules ?? defaultBiasRules,
+        // Always open on today's date — never the date saved last session
+        selectedDate: new Date().toISOString().split("T")[0],
       };
     }
 
