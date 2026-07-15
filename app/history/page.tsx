@@ -306,15 +306,20 @@ export default function HistoryPage() {
                 </div>
                 {(() => {
                   const ts = parseInt(selected.id.replace("trade-", ""), 10);
-                  const loggedAt = Number.isFinite(ts) ? new Date(ts).toLocaleString() : null;
+                  const loggedAt = selected.createdAt
+                    ? new Date(selected.createdAt).toLocaleString()
+                    : Number.isFinite(ts) ? new Date(ts).toLocaleString() : null;
+                  const closedAt = selected.closedAt ? new Date(selected.closedAt).toLocaleString() : null;
                   return (
                     <>
                       <p className="font-mono text-[10px] text-[#888]">
-                        Created: <span className="text-white font-bold">{loggedAt ?? fmtDate(selected.date)}</span>
+                        {selected.decision === "SKIP" ? "Skipped at" : "Taken at"}: <span className="text-white font-bold">{loggedAt ?? fmtDate(selected.date)}</span>
                       </p>
-                      <p className="font-mono text-[10px] text-[#888]">
-                        {selected.decision === "SKIP" ? "Skipped at" : "Taken at"}: <span className="text-white font-bold">{loggedAt ?? "—"}</span>
-                      </p>
+                      {selected.decision === "TAKE" && (
+                        <p className="font-mono text-[10px] text-[#888]">
+                          Closed at: <span className="text-white font-bold">{closedAt ?? (selected.outcome ? "—" : "still open")}</span>
+                        </p>
+                      )}
                       {selected.decision === "SKIP" && selected.notes && (
                         <p className="font-mono text-[10px] text-[#888]">
                           Reason: <span className="text-white italic">{selected.notes}</span>

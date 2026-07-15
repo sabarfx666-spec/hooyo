@@ -198,6 +198,7 @@ function reducer(state: SabarState, action: Action): SabarState {
         stopLossPips: 0,
         lotSize: 0,
         rr: 0,
+        createdAt: new Date().toISOString(),
         ...action.payload,
       };
       // Save images to IndexedDB (fire-and-forget)
@@ -255,9 +256,15 @@ function reducer(state: SabarState, action: Action): SabarState {
       imgSaveTrade(updated.id, updated).catch(() => {});
       return {
         ...state,
-        trades: state.trades.map((t) =>
-          t.id === updated.id ? { ...t, ...updated } : t
-        ),
+        trades: state.trades.map((t) => {
+          if (t.id !== updated.id) return t;
+          const next = { ...t, ...updated };
+          // Stamp the close time the moment an outcome is set/changed
+          if (updated.outcome !== undefined && updated.outcome !== t.outcome) {
+            next.closedAt = new Date().toISOString();
+          }
+          return next;
+        }),
       };
     }
 
