@@ -5,8 +5,18 @@ export interface WatchlistPair {
   custom: boolean;
 }
 
-export type PsychologyTag = "FOMO" | "CALM" | "FEAR" | "GREED" | "CUSTOM";
-export type Session = "LONDON" | "NEW_YORK";
+export type PsychologyTag =
+  | "FOMO" | "CALM" | "FEAR" | "GREED"
+  | "OVERCONFIDENT" | "HESITATION" | "REVENGE"
+  | "IMPATIENT" | "FOCUSED" | "UNCERTAIN"
+  | "CUSTOM";
+export type Session = "ASIAN" | "LONDON" | "NEW_YORK";
+
+export const SESSION_LABELS: Record<Session, string> = {
+  ASIAN: "Asian",
+  LONDON: "London",
+  NEW_YORK: "New York",
+};
 export type Bias = "BULLISH" | "BEARISH";
 
 export interface Rule {
@@ -24,6 +34,7 @@ export type BiasRuleSet = Record<"BULLISH" | "BEARISH", Rule[]>;
 export interface Trade {
   id: string;
   date: string;
+  createdAt?: number;   // epoch ms when the trade was logged (for time display)
   session: Session;
   pair: string;
   bias: Bias;

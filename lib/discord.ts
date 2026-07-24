@@ -23,7 +23,7 @@ export async function sendTradeToDiscord(webhookUrl: string, trade: TradePayload
   const pct = trade.totalRules > 0 ? Math.round((trade.checkedCount / trade.totalRules) * 100) : 0;
   const color = trade.outcome ? (OUTCOME_COLOR[trade.outcome] ?? 0x6AECE1) : 0xF59E0B;
   const dirArrow = trade.bias === "BULLISH" ? "↑" : "↓";
-  const sessionLabel = trade.session === "LONDON" ? "London" : "New York";
+  const sessionLabel = trade.session === "ASIAN" ? "Asian" : trade.session === "LONDON" ? "London" : "New York";
   const pnlStr = trade.pnl !== undefined
     ? `${trade.pnl >= 0 ? "+" : ""}$${Math.abs(trade.pnl).toFixed(2)}`
     : "—";

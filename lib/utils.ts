@@ -35,6 +35,16 @@ export function calcRR(entry: number, sl: number, tp: number): number {
   return Math.round((reward / risk) * 100) / 100;
 }
 
+export function getGrade(pct: number) {
+  if (pct >= 100) return { letter: "A+", color: "#22C55E" };
+  if (pct >= 92)  return { letter: "A",  color: "#4ADE80" };
+  if (pct >= 83)  return { letter: "A-", color: "#A3E635" };
+  if (pct >= 75)  return { letter: "B",  color: "#6AECE1" };
+  if (pct >= 67)  return { letter: "C+", color: "#F59E0B" };
+  if (pct >= 58)  return { letter: "D+", color: "#F97316" };
+  return               { letter: "D-", color: "#EF4444" };
+}
+
 export const PIP_VALUES: Record<string, number> = {
   "EUR/USD": 10,
   "GBP/USD": 10,

@@ -1,224 +1,38 @@
 "use client";
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
 import {
   ArrowLeft, Plus, Trash2, CreditCard, TrendingUp, BarChart2,
-  Link2, Camera, X, Upload, ChevronRight,
+  Link2, Camera, X, ChevronRight,
 } from "lucide-react";
 import Link from "next/link";
-import { VoiceMic, appendNote } from "@/components/VoiceMic";
+import { ChartSnapshotPanel } from "@/components/journal/ChartSnapshotPanel";
 
-type TF = "Weekly" | "Daily" | "4H" | "15M" | "5M" | "Result";
 type Account = { id: string; name: string; balance: number };
-
-const TIMEFRAMES: { key: TF; label: string }[] = [
-  { key: "Weekly", label: "1W" },
-  { key: "Daily",  label: "1D" },
-  { key: "4H",     label: "4H" },
-  { key: "15M",    label: "15M" },
-  { key: "5M",     label: "5M" },
-  { key: "Result", label: "Result" },
-];
 
 function tradePct(t: Trade) {
   return t.totalRules > 0 ? Math.round((t.checkedCount / t.totalRules) * 100) : 0;
 }
-function tradeR(t: Trade) {
-  // R = actual PnL divided by the dollar amount risked on the trade
-  if (t.pnl !== undefined && t.riskAmount > 0) return t.pnl / t.riskAmount;
-  return t.rr ?? 0;
+// %R uses a fixed reference: 1R = 1% = $1,000  (so $500 = 0.5%R, $1,500 = 1.5%R)
+const R_BASE = 100000;
+function pctR(pnl: number) {
+  return (pnl / R_BASE) * 100;
 }
-function fmtR(r: number) {
-  return `${r >= 0 ? "+" : "−"}${Math.abs(r).toFixed(1)}R`;
+function fmtPctR(v: number) {
+  return `${v >= 0 ? "+" : "−"}${Math.abs(v).toFixed(1)}%R`;
 }
 function gradeInfo(pct: number) {
-  if (pct >= 90) return { letter: "A+", color: "#00FF7F", bg: "rgba(0,255,127,0.12)" };
-  if (pct >= 70) return { letter: "B+", color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
-  if (pct >= 50) return { letter: "C-", color: "#F5A623", bg: "rgba(245,162,35,0.12)" };
-  return              { letter: "D-",  color: "#FF3B3B", bg: "rgba(255,59,59,0.12)" };
+  if (pct >= 100) return { letter: "A+", color: "#22C55E", bg: "rgba(34,197,94,0.12)" };
+  if (pct >= 92)  return { letter: "A",  color: "#4ADE80", bg: "rgba(74,222,128,0.12)" };
+  if (pct >= 83)  return { letter: "A-", color: "#A3E635", bg: "rgba(163,230,53,0.12)" };
+  if (pct >= 75)  return { letter: "B",  color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
+  if (pct >= 67)  return { letter: "C+", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" };
+  if (pct >= 58)  return { letter: "D+", color: "#F97316", bg: "rgba(249,115,22,0.12)" };
+  return               { letter: "D-", color: "#EF4444", bg: "rgba(239,68,68,0.12)" };
 }
 function hasCharts(t: Trade) {
   return t.chartProofs && Object.keys(t.chartProofs).length > 0;
-}
-
-/* ── Chart Snapshots Panel ────────────────────────────── */
-function ChartPanel({ trade, onClose }: { trade: Trade; onClose: () => void }) {
-  const { dispatch } = useSabar();
-  const [proofs, setProofs]     = useState<Partial<Record<TF, string>>>(trade.chartProofs ?? {});
-  const [tfNotes, setTfNotes]   = useState<Partial<Record<TF, string>>>({});
-  const [activeTf, setActiveTf] = useState<TF>("Weekly");
-  const [dragging, setDragging] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
-
-  /* paste anywhere in panel */
-  useEffect(() => {
-    const handler = (e: ClipboardEvent) => {
-      const item = Array.from(e.clipboardData?.items ?? []).find(i => i.type.startsWith("image/"));
-      if (!item) return;
-      const file = item.getAsFile();
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = ev => {
-        const url = ev.target?.result as string;
-        setProofs(p => ({ ...p, [activeTf]: url }));
-      };
-      reader.readAsDataURL(file);
-    };
-    window.addEventListener("paste", handler);
-    return () => window.removeEventListener("paste", handler);
-  }, [activeTf]);
-
-  const loadFile = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const url = ev.target?.result as string;
-      setProofs(p => ({ ...p, [activeTf]: url }));
-    };
-    reader.readAsDataURL(file);
-  }, [activeTf]);
-
-  const saveAll = () => {
-    dispatch({ type: "UPDATE_TRADE", payload: { id: trade.id, chartProofs: proofs as Trade["chartProofs"] } });
-    onClose();
-  };
-
-  const g = gradeInfo(tradePct(trade));
-
-  return (
-    <div className="fixed inset-y-0 right-0 z-50 flex flex-col w-[420px] shadow-2xl"
-      style={{ background: "#0A0A0A", borderLeft: "1px solid #1A1A1A" }}>
-
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: "#1A1A1A" }}>
-        <div className="flex items-center gap-2">
-          <Camera size={16} style={{ color: "#E53E3E" }} />
-          <span className="font-mono font-bold text-white text-sm">Chart Snapshots</span>
-          <span className="px-2 py-0.5 rounded font-mono text-[10px] font-bold"
-            style={{ background: "rgba(229,62,62,0.12)", color: "#E53E3E" }}>{trade.pair}</span>
-        </div>
-        <button onClick={onClose} className="text-[#444] hover:text-white transition-colors">
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Trade meta */}
-      <div className="px-5 py-3 border-b" style={{ borderColor: "#1A1A1A" }}>
-        <p className="font-mono text-[10px] text-[#444]">
-          {new Date(trade.date).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })}
-          {" • "}
-          {trade.bias === "BEARISH" ? "Bearish" : "Bullish"}
-          {" • "}
-          {trade.session === "LONDON" ? "London" : "New York"}
-        </p>
-      </div>
-
-      {/* Trade Info */}
-      <div className="px-5 py-3 border-b grid grid-cols-2 gap-2" style={{ borderColor: "#1A1A1A" }}>
-        {[
-          { label: "Outcome", value: trade.outcome ?? "—", color: trade.outcome === "WIN" ? "#00FF7F" : trade.outcome === "LOSS" ? "#FF3B3B" : "#6AECE1" },
-          { label: "RR Result", value: tradeR(trade) !== 0 ? fmtR(tradeR(trade)) : "—", color: tradeR(trade) >= 0 ? "#6AECE1" : "#FF3B3B" },
-          { label: "Grade", value: g.letter, color: g.color },
-          { label: "Status", value: trade.decision === "TAKE" ? "Taken" : "Skipped", color: "#fff" },
-        ].map(({ label, value, color }) => (
-          <div key={label} className="px-3 py-2 rounded-lg" style={{ background: "#111", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[9px] text-[#444] mb-0.5">{label}</p>
-            <p className="font-mono text-xs font-bold" style={{ color }}>{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Timeframe tabs */}
-      <div className="flex gap-1 px-4 py-3 border-b overflow-x-auto" style={{ borderColor: "#1A1A1A" }}>
-        {TIMEFRAMES.map(({ key, label }) => (
-          <button key={key} onClick={() => setActiveTf(key)}
-            className="flex-shrink-0 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold transition-all"
-            style={activeTf === key
-              ? { background: "#E53E3E", color: "#fff" }
-              : { background: "#111", border: "1px solid #1A1A1A", color: proofs[key] ? "#fff" : "#444" }}>
-            {label}
-            {proofs[key] && <span className="ml-1 w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#00FF7F" }} />}
-          </button>
-        ))}
-      </div>
-
-      {/* Chart upload zone */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        <p className="font-mono text-[10px] font-bold text-white">
-          {activeTf} <span className="text-[#444] font-normal">({TIMEFRAMES.find(t => t.key === activeTf)?.label})</span>
-        </p>
-
-        {/* Drop zone */}
-        <div
-          className="relative rounded-xl overflow-hidden transition-all cursor-pointer"
-          style={{
-            border: `2px dashed ${dragging ? "#E53E3E" : "#222"}`,
-            background: "#0D0D0D",
-            minHeight: 200,
-          }}
-          onDragOver={e => { e.preventDefault(); setDragging(true); }}
-          onDragLeave={() => setDragging(false)}
-          onDrop={e => {
-            e.preventDefault(); setDragging(false);
-            const file = e.dataTransfer.files[0];
-            if (file?.type.startsWith("image/")) loadFile(file);
-          }}
-          onClick={() => !proofs[activeTf] && fileRef.current?.click()}
-        >
-          {proofs[activeTf] ? (
-            <>
-              <img src={proofs[activeTf]} alt={activeTf}
-                className="w-full object-contain rounded-xl" style={{ maxHeight: 260 }} />
-              <button
-                onClick={e => { e.stopPropagation(); setProofs(p => { const n = { ...p }; delete n[activeTf]; return n; }); }}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all hover:opacity-90"
-                style={{ background: "#E53E3E" }}>
-                <X size={12} color="#fff" />
-              </button>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-12 gap-2">
-              <Camera size={28} style={{ color: "#222" }} />
-              <p className="font-mono font-bold text-xs text-white">{activeTf}</p>
-              <p className="font-mono text-[10px] text-[#444]">{TIMEFRAMES.find(t => t.key === activeTf)?.label}</p>
-              <p className="font-mono text-[9px] text-[#333] mt-1">Click + Ctrl+V or drag & drop</p>
-              <button
-                onClick={e => { e.stopPropagation(); fileRef.current?.click(); }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold mt-1 transition-all hover:opacity-90"
-                style={{ background: "rgba(229,62,62,0.15)", color: "#E53E3E", border: "1px solid rgba(229,62,62,0.2)" }}>
-                <Upload size={11} /> Upload
-              </button>
-            </div>
-          )}
-        </div>
-        <input ref={fileRef} type="file" accept="image/*" className="hidden"
-          onChange={e => { const f = e.target.files?.[0]; if (f) loadFile(f); e.target.value = ""; }} />
-
-        {/* Per-tf note */}
-        <div className="flex items-center justify-between mt-2 mb-1">
-          <p className="font-mono text-[9px] uppercase tracking-widest" style={{ color: "#444" }}>Note · {activeTf}</p>
-          <VoiceMic onText={t => setTfNotes(p => ({ ...p, [activeTf]: appendNote(p[activeTf], t) }))} />
-        </div>
-        <textarea
-          value={tfNotes[activeTf] ?? ""}
-          onChange={e => setTfNotes(p => ({ ...p, [activeTf]: e.target.value }))}
-          placeholder={`Add note for ${activeTf} chart...`}
-          rows={3}
-          className="w-full px-3 py-2.5 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none resize-none"
-          style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}
-        />
-      </div>
-
-      {/* Save */}
-      <div className="px-4 py-4 border-t" style={{ borderColor: "#1A1A1A" }}>
-        <button onClick={saveAll}
-          className="w-full py-3 rounded-xl font-mono text-sm font-bold text-white flex items-center justify-center gap-2 transition-all hover:opacity-90"
-          style={{ background: "#E53E3E" }}>
-          Save All Notes
-        </button>
-      </div>
-    </div>
-  );
 }
 
 /* ── Main Page ────────────────────────────────────────── */
@@ -274,7 +88,6 @@ export default function AccountsPage() {
   }, [state.trades, account]);
 
   const totalPnl   = linkedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
-  const totalR     = linkedTrades.reduce((s, t) => s + tradeR(t), 0);
   const totalPages = Math.max(1, Math.ceil(linkedTrades.length / rowsPerPage));
   const safePage   = Math.min(page, totalPages);
   const pageStart  = (safePage - 1) * rowsPerPage;
@@ -285,7 +98,7 @@ export default function AccountsPage() {
 
   return (
     <div className="relative">
-      <div className={`max-w-5xl mx-auto space-y-5 p-4 transition-all ${chartTrade ? "pr-[440px]" : ""}`}>
+      <div className="max-w-5xl mx-auto space-y-5 p-4">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -347,7 +160,7 @@ export default function AccountsPage() {
               {[
                 { label: "Account Balance", value: `$${curBal.toLocaleString()}`, sub: pctGain ? `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toLocaleString()} (+${pctGain}%)` : "", color: "#00FF7F", Icon: CreditCard },
                 { label: "Total PnL ($)",   value: `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toLocaleString()}`, sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: TrendingUp },
-                { label: "Total R",         value: `${totalR >= 0 ? "+" : ""}${totalR.toFixed(1)}R`, sub: "", color: "#6AECE1", Icon: BarChart2 },
+                { label: "Total R",         value: fmtPctR(pctR(totalPnl)), sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: BarChart2 },
                 { label: "Trades Linked",   value: String(linkedTrades.length), sub: "", color: "#FF3B3B", Icon: Link2 },
               ].map(({ label, value, sub, color, Icon }) => (
                 <div key={label} className="p-4 rounded-xl" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
@@ -405,7 +218,7 @@ export default function AccountsPage() {
                               <Camera size={13} style={{ color: hasImg ? "#E53E3E" : "#333" }} />
                             </button>
                           </td>
-                          <td className="px-4 py-3 font-mono text-xs" style={{ color: tradeR(t) >= 0 ? "#6AECE1" : "#FF3B3B" }}>{fmtR(tradeR(t))}</td>
+                          <td className="px-4 py-3 font-mono text-xs" style={{ color: (t.pnl ?? 0) >= 0 ? "#00FF7F" : "#FF3B3B" }}>{t.pnl !== undefined ? fmtPctR(pctR(t.pnl)) : "—"}</td>
                           <td className="px-4 py-3 font-mono text-xs font-bold" style={{ color: (t.pnl ?? 0) >= 0 ? "#00FF7F" : "#FF3B3B" }}>
                             {t.pnl !== undefined ? `${t.pnl >= 0 ? "+" : "−"}$${Math.abs(t.pnl).toLocaleString()}` : "—"}
                           </td>
@@ -461,9 +274,9 @@ export default function AccountsPage() {
         )}
       </div>
 
-      {/* Chart Snapshots side panel */}
+      {/* Chart Snapshots side panel (shared with Journal — has zoom/replace/delete) */}
       {chartTrade && (
-        <ChartPanel
+        <ChartSnapshotPanel
           key={chartTrade.id}
           trade={chartTrade}
           onClose={() => setChartTrade(null)}

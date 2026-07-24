@@ -1,4 +1,4 @@
-import { Trade } from "@/store/types";
+import { Trade, SESSION_LABELS } from "@/store/types";
 import { Badge } from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
 
@@ -29,7 +29,7 @@ export function DayDetailPanel({ date, trades }: DayDetailPanelProps) {
                 </div>
               </div>
               <div className="flex gap-3 font-mono text-xs text-[#A0A0A0]">
-                <span>{trade.session === "LONDON" ? "London" : "New York"}</span>
+                <span>{SESSION_LABELS[trade.session]}</span>
                 <span className={trade.bias === "BULLISH" ? "text-[#6AECE1]" : "text-[#FF3B3B]"}>
                   {trade.bias}
                 </span>

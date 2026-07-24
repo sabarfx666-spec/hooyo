@@ -3,44 +3,53 @@ import { useSabar } from "@/store/SabarContext";
 import { Session } from "@/store/types";
 import { MapPin } from "lucide-react";
 
-const options: { value: Session; label: string; color: string; bg: string; glowAnim: string }[] = [
-  {
-    value: "LONDON",   label: "London",   color: "#D946A8",
-    bg: "rgba(217,70,168,0.10)", glowAnim: "anim-glow-amber",
-  },
-  {
-    value: "NEW_YORK", label: "New York", color: "#F59E0B",
-    bg: "rgba(245,158,11,0.10)", glowAnim: "anim-glow-orange",
-  },
+const options: { value: Session; label: string }[] = [
+  { value: "ASIAN",    label: "Asian"    },
+  { value: "LONDON",   label: "London"   },
+  { value: "NEW_YORK", label: "New York" },
 ];
+
+const ACTIVE = "#F59E0B";
 
 export function SessionSelector() {
   const { state, dispatch } = useSabar();
 
   return (
-    <div className="shimmer-card card-hover relative overflow-hidden rounded-xl p-4" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-[#444] mb-3">Session</p>
-      <div className="flex gap-2">
-        {options.map(({ value, label, color, bg, glowAnim }) => {
+    <div>
+      <p className="font-sans text-sm font-medium mb-2.5" style={{ color: "#A0A0A0" }}>Session</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {options.map(({ value, label }) => {
           const active = state.currentSession === value;
           return (
             <button
               key={value}
               onClick={() => dispatch({ type: "SET_SESSION", payload: value })}
-              className={`flex-1 flex items-center justify-center gap-2 py-4 rounded-xl font-sans font-bold text-sm transition-all duration-300 border ${active ? glowAnim : ""}`}
-              style={{
-                color:       active ? color : "#333",
-                borderColor: active ? color + "55" : "#1A1A1A",
-                background:  active ? bg : "rgba(255,255,255,0.02)",
-              }}
+              className="relative overflow-hidden flex items-center justify-center gap-2 py-3.5 rounded-xl font-sans font-semibold text-base transition-all duration-300 border"
+              style={active
+                ? {
+                    color: ACTIVE,
+                    borderColor: ACTIVE,
+                    background: `${ACTIVE}14`,
+                    boxShadow: `0 0 18px 2px ${ACTIVE}33, inset 0 0 24px ${ACTIVE}0F`,
+                  }
+                : {
+                    color: "#8A8A8A",
+                    borderColor: "#2A2A2A",
+                    background: "rgba(255,255,255,0.02)",
+                  }}
             >
-              <MapPin
-                size={16}
-                strokeWidth={2.5}
-                className={active ? "anim-float" : ""}
-                style={{ color: active ? color : "#333" }}
-              />
-              {label}
+              {active && (
+                <span
+                  className="absolute inset-y-0 anim-sweep pointer-events-none"
+                  style={{
+                    left: "-50%",
+                    width: "200%",
+                    background: `linear-gradient(90deg, transparent, ${ACTIVE}17 35%, ${ACTIVE}40 50%, ${ACTIVE}17 65%, transparent)`,
+                  }}
+                />
+              )}
+              <MapPin size={17} strokeWidth={2.5} className="relative z-10" style={{ color: active ? ACTIVE : "#8A8A8A" }} />
+              <span className="relative z-10">{label}</span>
             </button>
           );
         })}

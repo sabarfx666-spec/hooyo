@@ -20,6 +20,7 @@ export function FilterBar({ pair, session, bias, outcome, search, onChange }: Fi
       </select>
       <select className={selectCls} value={session} onChange={(e) => onChange("session", e.target.value)}>
         <option value="">All Sessions</option>
+        <option value="ASIAN">Asian</option>
         <option value="LONDON">London</option>
         <option value="NEW_YORK">New York</option>
       </select>

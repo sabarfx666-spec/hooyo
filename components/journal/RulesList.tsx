@@ -13,6 +13,7 @@ const PANEL = {
   ENTRY: { title: "LTF Entry Model", subtitle: "New York Session" },
 };
 
+const ACCENT = "#22C55E";
 const DELAYS = ["0ms","60ms","120ms","180ms","240ms","300ms","360ms","420ms","480ms","540ms"];
 
 export function RulesList({ category }: RulesListProps) {
@@ -25,9 +26,8 @@ export function RulesList({ category }: RulesListProps) {
 
   const bias      = state.currentBias;
   const isBull    = bias === "BULLISH";
-  const biasColor = isBull ? "#00FF7F" : "#FF3B3B";
-  const biasBg    = isBull ? "rgba(0,255,127,0.06)" : "rgba(255,59,59,0.06)";
-  const accentColor = category === "BASIS" ? "#6AECE1" : "#00FF7F";
+  const biasColor = isBull ? "#22C55E" : "#EF4444";
+  const biasBg    = isBull ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)";
 
   const biasSet   = state.biasRules?.[bias] ?? [];
   const rules     = biasSet.filter(r => r.category === category);
@@ -58,29 +58,25 @@ export function RulesList({ category }: RulesListProps) {
   const onDragEnd = () => { dragIndex.current = null; setDragOver(null); };
 
   return (
-    <div className="shimmer-card relative overflow-hidden rounded-xl p-5 h-full"
-      style={{ background: "#0D0D0D", border: `1px solid ${accentColor}22` }}>
-
-      {/* Top glow line */}
-      <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-xl"
-        style={{ background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`, opacity: 0.6 }} />
+    <div className="rounded-2xl p-5 h-full"
+      style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>
 
       {/* Header */}
       <div className="flex items-start justify-between mb-1">
         <div className="flex items-center gap-2">
-          <ChevronRight size={17} strokeWidth={2.5} className="anim-float" style={{ color: accentColor }} />
-          <h3 className="font-mono font-bold text-white text-base tracking-wide">{PANEL[category].title}</h3>
+          <ChevronRight size={18} strokeWidth={3} style={{ color: ACCENT }} />
+          <h3 className="font-sans font-bold text-white text-lg">{PANEL[category].title}</h3>
         </div>
         <div className="flex flex-col items-end gap-1.5">
-          <span className="font-mono text-sm font-bold" style={{ color: accentColor }}>{checked}/{total}</span>
-          <div className="w-14 h-1.5 rounded-full overflow-hidden" style={{ background: "#1A1A1A" }}>
+          <span className="font-sans text-base font-bold" style={{ color: ACCENT }}>{checked}/{total}</span>
+          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "#1E1E1E" }}>
             <div className="h-full rounded-full transition-all duration-700"
-              style={{ width: `${pct}%`, background: accentColor, boxShadow: `0 0 8px 2px ${accentColor}88` }} />
+              style={{ width: `${pct}%`, background: ACCENT, boxShadow: `0 0 8px 2px ${ACCENT}88` }} />
           </div>
         </div>
       </div>
 
-      <p className="font-mono text-[10px] uppercase tracking-widest mb-4 pl-6" style={{ color: "#333" }}>
+      <p className="font-sans text-sm mb-4 pl-6" style={{ color: "#777" }}>
         {PANEL[category].subtitle}
       </p>
 
@@ -96,14 +92,14 @@ export function RulesList({ category }: RulesListProps) {
             style={{ animationDelay: DELAYS[index] ?? "500ms", animationFillMode: "both" }}>
 
             {dragOver === index && (
-              <div className="absolute -top-0.5 left-0 right-0 h-0.5 rounded-full" style={{ backgroundColor: accentColor }} />
+              <div className="absolute -top-0.5 left-0 right-0 h-0.5 rounded-full" style={{ backgroundColor: ACCENT }} />
             )}
 
             <div className="flex flex-col">
               <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg border-l-4 transition-all duration-200"
                 style={rule.checked
-                  ? { borderLeftColor: biasColor, background: biasBg, boxShadow: `0 0 12px 1px ${biasColor}18` }
-                  : { borderLeftColor: rule.indent ? "#1A1A1A" : "transparent", background: "transparent" }}>
+                  ? { borderLeftColor: biasColor, background: biasBg }
+                  : { borderLeftColor: rule.indent ? "#222" : "transparent", background: "transparent" }}>
 
                 {/* Indent bar */}
                 {rule.indent && <div className="w-px h-4 rounded-full flex-shrink-0" style={{ background: "#2A2A2A" }} />}
@@ -122,37 +118,39 @@ export function RulesList({ category }: RulesListProps) {
                   }}>
                   {rule.checked
                     ? <span className="rounded-full flex items-center justify-center"
-                        style={{ width: rule.indent ? 18 : 22, height: rule.indent ? 18 : 22, background: biasColor }}>
+                        style={{ width: rule.indent ? 19 : 23, height: rule.indent ? 19 : 23, background: biasColor }}>
                         <Check size={rule.indent ? 11 : 13} strokeWidth={3.5} color="#FFFFFF" />
                       </span>
-                    : <Circle size={rule.indent ? 18 : 22} strokeWidth={1.5} color="#333" />}
+                    : <Circle size={rule.indent ? 19 : 23} strokeWidth={1.5} color="#4A4A4A" />}
                 </button>
 
                 {/* Label */}
                 <button onClick={() => handleToggle(rule.id)}
                   className="flex-1 text-left font-sans transition-all duration-200"
-                  style={{ fontSize: rule.indent ? "12px" : "13px", color: rule.checked ? "#fff" : "#555", fontWeight: rule.checked ? 600 : 400 }}>
+                  style={{ fontSize: rule.indent ? "13px" : "15px", color: rule.checked ? "#fff" : "#9A9A9A", fontWeight: rule.checked ? 600 : 400 }}>
                   {rule.label}
                 </button>
 
                 {/* Either/Or badge */}
                 {rule.tag === "EITHER_OR" && (
-                  <span className="shrink-0 px-1.5 py-0.5 rounded-full font-mono text-[9px] font-bold"
-                    style={{ background: "rgba(106,236,225,0.1)", color: "#6AECE1", border: "1px solid rgba(106,236,225,0.25)" }}>
+                  <span className="shrink-0 px-2 py-0.5 rounded-md font-sans text-[11px] font-semibold italic"
+                    style={{ background: "rgba(34,197,94,0.1)", color: ACCENT, border: "1px solid rgba(34,197,94,0.3)" }}>
                     Either/Or
                   </span>
                 )}
 
                 {/* Delete */}
                 <button onClick={() => dispatch({ type: "REMOVE_BIAS_RULE", payload: { bias, id: rule.id } })}
-                  className="opacity-0 group-hover:opacity-100 shrink-0 text-[#333] hover:text-[#FF3B3B] transition-all duration-150" title="Delete rule">
+                  className="opacity-0 group-hover:opacity-100 shrink-0 text-[#333] hover:text-[#EF4444] transition-all duration-150" title="Delete rule">
                   <Trash2 size={12} />
                 </button>
               </div>
 
               {/* Sub-note */}
               {rule.note && (
-                <p className="ml-14 mt-0.5 font-mono text-[10px]" style={{ color: "#555" }}>{rule.note}</p>
+                <p className="ml-14 mt-0.5 font-sans text-xs" style={{ color: rule.checked ? biasColor : "#666" }}>
+                  {rule.note}
+                </p>
               )}
             </div>
           </div>
@@ -160,24 +158,24 @@ export function RulesList({ category }: RulesListProps) {
       </div>
 
       {/* Add rule */}
-      <div className="mt-4 pt-3 border-t" style={{ borderColor: "#1A1A1A" }}>
+      <div className="mt-4 pt-3 border-t" style={{ borderColor: "#222" }}>
         {adding ? (
           <div className="flex gap-1.5 anim-fade-up">
             <input autoFocus value={input} onChange={e => setInput(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") handleAdd(); if (e.key === "Escape") { setAdding(false); setInput(""); } }}
               placeholder="Rule label..."
-              className="flex-1 text-white font-mono text-xs px-2 py-1.5 rounded focus:outline-none placeholder-[#555]"
-              style={{ background: "#1A1A1A", border: `1px solid ${accentColor}44` }} />
-            <button onClick={handleAdd} className="px-2 py-1.5 rounded font-mono text-xs font-bold text-black" style={{ background: accentColor }}>+</button>
-            <button onClick={() => { setAdding(false); setInput(""); }} className="px-2 py-1.5 text-[#555] rounded text-xs" style={{ border: "1px solid #2A2A2A" }}>✕</button>
+              className="flex-1 text-white font-sans text-sm px-2.5 py-2 rounded-lg focus:outline-none placeholder-[#555]"
+              style={{ background: "#161616", border: `1px solid ${ACCENT}44` }} />
+            <button onClick={handleAdd} className="px-3 py-2 rounded-lg font-sans text-sm font-bold text-black" style={{ background: ACCENT }}>+</button>
+            <button onClick={() => { setAdding(false); setInput(""); }} className="px-3 py-2 text-[#555] rounded-lg text-sm" style={{ border: "1px solid #2A2A2A" }}>✕</button>
           </div>
         ) : (
           <button onClick={() => setAdding(true)}
-            className="flex items-center gap-1.5 text-xs font-mono transition-colors duration-200"
-            style={{ color: "#333" }}
-            onMouseEnter={e => (e.currentTarget.style.color = accentColor)}
-            onMouseLeave={e => (e.currentTarget.style.color = "#333")}>
-            <Plus size={11} /> Add Rule
+            className="flex items-center gap-1.5 text-sm font-sans transition-colors duration-200"
+            style={{ color: "#666" }}
+            onMouseEnter={e => (e.currentTarget.style.color = ACCENT)}
+            onMouseLeave={e => (e.currentTarget.style.color = "#666")}>
+            <Plus size={13} /> Add Rule
           </button>
         )}
       </div>

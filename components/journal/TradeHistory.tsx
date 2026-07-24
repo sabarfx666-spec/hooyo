@@ -10,6 +10,7 @@ const OUTCOME_STYLE: Record<string, { color: string; bg: string; label: string }
 };
 
 const SESSION_LABEL: Record<string, string> = {
+  ASIAN:    "Asian",
   LONDON:   "London",
   NEW_YORK: "New York",
 };

@@ -2,80 +2,44 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { LayoutDashboard, BarChart2, ScrollText, CalendarDays, Globe, User, Clock, LogOut, ChevronDown, Shield, TrendingUp, BookOpen, Sun, Moon, Target } from "lucide-react";
+import { CalendarDays, User, LogOut, ChevronDown, Shield, TrendingUp, BookOpen, Sun, Moon } from "lucide-react";
 import { useAuth } from "@/store/AuthContext";
 import { useSabar } from "@/store/SabarContext";
+import { SunriseLogo } from "@/components/SunriseLogo";
 
 const navItems = [
-  { href: "/",        label: "Dashboard",      icon: LayoutDashboard },
-  { href: "/weekly",  label: "Weekly Outlook", icon: TrendingUp       },
-  { href: "/history", label: "Journal",        icon: BookOpen         },
-  { href: "/habits",  label: "Habits",         icon: Target           },
+  { href: "/weekly",  label: "Weekly Outlook", icon: TrendingUp },
+  { href: "/history", label: "Journal",        icon: BookOpen   },
 ];
 
-function LiveClock() {
-  const [now, setNow] = useState<Date | null>(null);
+function DatePickerButton() {
   const { state, dispatch } = useSabar();
   const dateInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    setNow(new Date());
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-
-  const timeStr = now
-    ? now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })
-    : "--:--:--";
-
-  const tz = now
-    ? now.toLocaleTimeString("en-US", { timeZoneName: "short" }).split(" ").pop() ?? ""
-    : "";
-
-  // Format selectedDate for display
-  const selectedDate = state.selectedDate
-    ? new Date(state.selectedDate + "T12:00:00")
-    : new Date();
-  const dateStr = selectedDate.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
   const isToday = state.selectedDate === new Date().toISOString().split("T")[0];
 
   return (
-    <div className="flex items-center gap-2">
-      {/* Clickable Date Picker */}
-      <div className="relative">
-        <button
-          onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
-          className="px-3 py-1.5 rounded-lg font-mono text-xs font-semibold text-white flex items-center gap-1.5 transition-all hover:border-[#E53E3E]"
-          style={{
-            background: "#111",
-            border: `1px solid ${isToday ? "#222" : "#E53E3E"}`,
-            color: isToday ? "#fff" : "#E53E3E",
-          }}
-          title="Click to change journal date"
-        >
-          <CalendarDays size={11} strokeWidth={2.5} style={{ color: isToday ? "#555" : "#E53E3E" }} />
-          {dateStr}
-        </button>
-        <input
-          ref={dateInputRef}
-          type="date"
-          value={state.selectedDate}
-          onChange={e => {
-            if (e.target.value) dispatch({ type: "SET_DATE", payload: e.target.value });
-          }}
-          className="absolute opacity-0 pointer-events-none w-0 h-0"
-          style={{ top: "100%", left: 0 }}
-        />
-      </div>
-
-      {/* Time */}
-      <div
-        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs font-semibold"
-        style={{ background: "#0A1A12", border: "1px solid #1A3A24", color: "#00FF7F" }}
+    <div className="relative">
+      <button
+        onClick={() => dateInputRef.current?.showPicker?.() ?? dateInputRef.current?.click()}
+        className="w-9 h-9 flex items-center justify-center rounded-xl transition-all hover:border-[#EF4444]"
+        style={{
+          background: "#141414",
+          border: `1px solid ${isToday ? "#2A2A2A" : "#EF4444"}`,
+        }}
+        title="Click to change journal date"
       >
-        <Clock size={11} strokeWidth={2.5} />
-        {timeStr} <span className="text-[#00994D] ml-0.5">{tz}</span>
-      </div>
+        <CalendarDays size={15} strokeWidth={2} style={{ color: isToday ? "#C0C0C0" : "#EF4444" }} />
+      </button>
+      <input
+        ref={dateInputRef}
+        type="date"
+        value={state.selectedDate}
+        onChange={e => {
+          if (e.target.value) dispatch({ type: "SET_DATE", payload: e.target.value });
+        }}
+        className="absolute opacity-0 pointer-events-none w-0 h-0"
+        style={{ top: "100%", left: 0 }}
+      />
     </div>
   );
 }
@@ -98,10 +62,10 @@ function UserMenu() {
     return (
       <Link
         href="/login"
-        className="flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold font-sans text-white transition-all hover:opacity-90"
-        style={{ background: "#E53E3E", boxShadow: "0 0 12px 2px rgba(229,62,62,0.3)" }}
+        className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold font-sans text-white transition-all hover:opacity-90"
+        style={{ background: "#EF4444", boxShadow: "0 0 14px 2px rgba(239,68,68,0.35)" }}
       >
-        <User size={13} strokeWidth={2} />
+        <User size={14} strokeWidth={2.5} />
         Login
       </Link>
     );
@@ -119,7 +83,7 @@ function UserMenu() {
         {/* Avatar */}
         <div
           className="w-6 h-6 rounded-full flex items-center justify-center font-mono text-[10px] font-bold"
-          style={{ background: "#E53E3E", color: "#fff" }}
+          style={{ background: "#EF4444", color: "#fff" }}
         >
           {initials}
         </div>
@@ -136,14 +100,14 @@ function UserMenu() {
             <div className="flex items-center gap-2">
               <p className="font-semibold text-sm text-white truncate">{user.name}</p>
               {user.role === "admin" && (
-                <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold" style={{ background: "rgba(229,62,62,0.15)", color: "#E53E3E" }}>ADMIN</span>
+                <span className="px-1.5 py-0.5 rounded font-mono text-[9px] font-bold" style={{ background: "rgba(239,68,68,0.15)", color: "#EF4444" }}>ADMIN</span>
               )}
             </div>
           </div>
           {user.role === "admin" && (
             <button
               onClick={() => { setOpen(false); router.push("/admin"); }}
-              className="w-full flex items-center gap-2 px-4 py-3 text-sm font-sans text-[#E53E3E] hover:bg-[#1A1A1A] transition-colors border-b border-[#1A1A1A]"
+              className="w-full flex items-center gap-2 px-4 py-3 text-sm font-sans text-[#EF4444] hover:bg-[#1A1A1A] transition-colors border-b border-[#1A1A1A]"
             >
               <Shield size={14} />
               User Management
@@ -184,12 +148,11 @@ function DarkModeToggle() {
   return (
     <button
       onClick={toggle}
-      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all"
-      style={{ background: "#111", border: "1px solid #222", color: dark ? "#F59E0B" : "#6AECE1" }}
+      className="w-9 h-9 flex items-center justify-center rounded-xl transition-all"
+      style={{ background: "#141414", border: "1px solid #2A2A2A", color: dark ? "#F59E0B" : "#6AECE1" }}
       title={dark ? "Switch to Light Mode" : "Switch to Dark Mode"}
     >
-      {dark ? <Sun size={13} /> : <Moon size={13} />}
-      {dark ? "Light" : "Dark"}
+      {dark ? <Sun size={15} /> : <Moon size={15} />}
     </button>
   );
 }
@@ -200,34 +163,55 @@ export function Topbar() {
   if (HIDDEN_PATHS.includes(pathname)) return null;
 
   return (
-    <header className="flex items-center justify-between px-4 py-2 border-b border-[#2A2A2A] bg-[#0D0D0D]">
+    <header className="flex items-center justify-between gap-3 px-4 py-3"
+      style={{ background: "rgba(10,10,10,0.85)", backdropFilter: "blur(8px)" }}>
 
-      {/* Nav pills */}
-      <nav className="flex items-center gap-1 flex-wrap">
+      {/* Brand — links to dashboard */}
+      <Link href="/" className="flex items-center gap-3 min-w-0 group">
+        <div
+          className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 transition-all group-hover:scale-105"
+          style={{
+            background: "rgba(245,158,11,0.06)",
+            border: "1px solid rgba(245,158,11,0.45)",
+            boxShadow: "0 0 16px 2px rgba(245,158,11,0.22)",
+          }}
+        >
+          <SunriseLogo size={36} />
+        </div>
+        <div className="min-w-0">
+          <p
+            className="font-sans text-2xl font-black leading-none"
+            style={{ color: "#EF4444", textShadow: "0 0 18px rgba(239,68,68,0.45)" }}
+          >
+            A+
+          </p>
+          <p className="font-sans text-xs mt-0.5 truncate" style={{ color: "#8A8A8A" }}>
+            Confirm your trade setup before entry
+          </p>
+        </div>
+      </Link>
+
+      {/* Right: theme + nav + date + user */}
+      <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+        <DarkModeToggle />
         {navItems.map(({ href, label, icon: Icon }) => {
           const active = pathname === href;
           return (
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-sans font-medium transition-all duration-150"
+              className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-sans font-semibold transition-all duration-150"
               style={{
-                color: active ? "#6AECE1" : "#555",
-                background: active ? "rgba(106,236,225,0.08)" : "transparent",
-                border: `1px solid ${active ? "rgba(106,236,225,0.25)" : "#1A1A1A"}`,
+                color: active ? "#EF4444" : "#C0C0C0",
+                background: active ? "rgba(239,68,68,0.08)" : "transparent",
               }}
             >
-              <Icon size={13} strokeWidth={2} />
-              {label}
+              <Icon size={16} strokeWidth={2} />
+              <span className="hidden md:inline">{label}</span>
             </Link>
           );
         })}
-      </nav>
-
-      {/* Right: dark mode + clock + user */}
-      <div className="flex items-center gap-3">
-        <DarkModeToggle />
-        <LiveClock />
+        <DatePickerButton />
         <UserMenu />
       </div>
 

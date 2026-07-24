@@ -75,7 +75,7 @@ export function TradeRow({ trade }: { trade: Trade }) {
       >
         <td className="px-3 py-2.5 font-mono text-xs text-[#A0A0A0] whitespace-nowrap">{formatDate(trade.date)}</td>
         <td className="px-3 py-2.5 font-mono text-xs text-[#FF0000] font-bold">{trade.pair}</td>
-        <td className="px-3 py-2.5 font-mono text-xs text-white">{trade.session === "LONDON" ? "LDN" : "NY"}</td>
+        <td className="px-3 py-2.5 font-mono text-xs text-white">{trade.session === "ASIAN" ? "AS" : trade.session === "LONDON" ? "LDN" : "NY"}</td>
         <td className="px-3 py-2.5">
           <span className={`font-mono text-xs font-bold ${trade.bias === "BULLISH" ? "text-[#6AECE1]" : "text-[#FF3B3B]"}`}>
             {trade.bias === "BULLISH" ? "↑" : "↓"} {trade.bias}

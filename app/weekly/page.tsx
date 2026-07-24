@@ -1,551 +1,419 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import {
-  TrendingUp, TrendingDown, ChevronLeft, ChevronRight,
-  Upload, X, Image as ImageIcon, FileText, Check, Send, Settings,
+  Plus, Trash2, TrendingUp, TrendingDown, Minus,
+  Upload, X, Image as ImageIcon, MapPin,
 } from "lucide-react";
-import { NewsAlarms } from "@/components/journal/NewsAlarms";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
-import { imgSave, imgLoad } from "@/lib/db";
+import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
-const WEEKLY_KEY    = "sabar-weekly-outlook";
-const DISCORD_KEY   = "sabar-notify-discord";
-const SAVED_PAIRS_KEY = "sabar-weekly-saved-pairs";
+const STORE_KEY = "sabar-outlook-entries";
+const outlookImgKey = (id: string) => `outlook_${id}`;
 
-const weekImgKey = (ws: string, slot: string) => `weekly_${ws}_${slot}`;
+const GREEN = "#22C55E";
+const RED   = "#EF4444";
+const AMBER = "#F59E0B";
 
-const PAIRS = ["EUR/USD", "GBP/USD", "USD/JPY", "XAU/USD", "GBP/JPY", "EUR/JPY", "USD/CAD", "AUD/USD"];
+type OutlookBias = "BULLISH" | "BEARISH" | "NEUTRAL";
 
-interface WeeklyEntry {
-  weekStart:   string;
-  bias:        "BULLISH" | "BEARISH" | "RANGING" | null;
-  pair:        string | null;
-  dol:         "BSL" | "SSL" | "MIXED" | null;
-  imgBefore:   string | null;
-  imgAfter:    string | null;
-  imgDaily:    string | null;
-  biases:      Record<string, "BULLISH" | "BEARISH" | "NEUTRAL">;
-  keyLevels:   string;
-  newsEvents:  string;
-  confluences: string;
-  gamePlan:    string;
-  notes:       string;
-  done:        boolean;
+interface OutlookEntry {
+  id: string;
+  date: string;               // YYYY-MM-DD
+  pair: string;
+  bias: OutlookBias;
+  sessions: string[];         // Asian / London / New York
+  timeframes: string[];       // Weekly / Daily / 4H / 1H / 15M
+  confidence: number;         // 0–100
+  biasNote: string;           // 1-line weekly bias
+  analysis: string;           // full analysis / game plan
+  hasImage: boolean;
 }
 
-const BLANK = (ws: string): WeeklyEntry => ({
-  weekStart: ws, bias: null, pair: null, dol: null,
-  imgBefore: null, imgAfter: null, imgDaily: null, biases: {},
-  keyLevels: "", newsEvents: "", confluences: "", gamePlan: "", notes: "", done: false,
+const SESSIONS   = ["Asian", "London", "New York"];
+const TIMEFRAMES = ["Weekly", "Daily", "4H", "1H", "15M"];
+const PAIRS      = ["EUR/USD", "GBP/USD", "XAU/USD", "GBP/JPY", "USD/JPY"];
+
+const BIAS_META: Record<OutlookBias, { label: string; color: string; Icon: typeof TrendingUp }> = {
+  BULLISH: { label: "Bullish", color: GREEN,     Icon: TrendingUp   },
+  BEARISH: { label: "Bearish", color: RED,       Icon: TrendingDown },
+  NEUTRAL: { label: "Neutral", color: "#9A9A9A", Icon: Minus        },
+};
+
+const newEntry = (): OutlookEntry => ({
+  id: `ol-${Date.now()}`,
+  date: new Date().toISOString().split("T")[0],
+  pair: "EUR/USD",
+  bias: "NEUTRAL",
+  sessions: [],
+  timeframes: [],
+  confidence: 50,
+  biasNote: "",
+  analysis: "",
+  hasImage: false,
 });
 
-function getWeekStart(date: Date) {
-  const d = new Date(date);
-  const day = d.getDay();
-  d.setDate(d.getDate() - day + (day === 0 ? -6 : 1));
-  return d.toISOString().split("T")[0];
-}
-function offsetWeek(ws: string, n: number) {
-  const d = new Date(ws); d.setDate(d.getDate() + n * 7);
-  return d.toISOString().split("T")[0];
-}
-function formatWeek(ws: string) {
-  const s = new Date(ws + "T12:00:00");
-  const e = new Date(ws + "T12:00:00"); e.setDate(e.getDate() + 4);
-  return `${s.toLocaleDateString("en-US",{month:"short",day:"numeric"})} – ${e.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"})}`;
-}
+const weekday = (date: string) =>
+  new Date(date + "T12:00:00").toLocaleDateString("en-US", { weekday: "long" });
 
 export default function WeeklyOutlookPage() {
-  const todayWeek = getWeekStart(new Date());
-  const [weekStart, setWeekStart] = useState(todayWeek);
-  const [entries, setEntries]     = useState<Record<string, WeeklyEntry>>({});
-  const [savedPairs, setSavedPairs] = useState<string[]>(["EUR/USD","GBP/USD","XAU/USD","GBP/JPY"]);
-  const [pairInput, setPairInput] = useState("");
-  const [dragOver, setDragOver]   = useState<string | null>(null);
-  const [discord, setDiscord]       = useState<"idle"|"sending"|"sent"|"error">("idle");
-  const [showDiscordSettings, setShowDiscordSettings] = useState(false);
-  const [webhookInput, setWebhookInput] = useState("");
-  const [webhookSaved, setWebhookSaved] = useState(false);
-  const [saveFeedback, setSaveFeedback] = useState(false);
-  const fileRefMonthly = useRef<HTMLInputElement>(null);
-  const fileRefWeekly  = useRef<HTMLInputElement>(null);
-  const fileRefDaily   = useRef<HTMLInputElement>(null);
+  const [entries, setEntries]       = useState<OutlookEntry[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [filterPair, setFilterPair] = useState("");
+  const [filterBias, setFilterBias] = useState("");
+  const [image, setImage]           = useState<string | null>(null);
+  const [dragOver, setDragOver]     = useState(false);
+  const [loaded, setLoaded]         = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(WEEKLY_KEY);
+      const raw = localStorage.getItem(STORE_KEY);
       if (raw) {
-        const parsed: Record<string, WeeklyEntry> = JSON.parse(raw);
+        const parsed: OutlookEntry[] = JSON.parse(raw);
         setEntries(parsed);
+        if (parsed.length > 0) setSelectedId(parsed[0].id);
       }
-      const sp = localStorage.getItem(SAVED_PAIRS_KEY);
-      const wh = localStorage.getItem(DISCORD_KEY);
-      if (wh) setWebhookInput(wh);
-      if (sp) setSavedPairs(JSON.parse(sp));
     } catch {}
+    setLoaded(true);
   }, []);
 
-  // Load images from IndexedDB whenever week changes
+  const entry = entries.find(e => e.id === selectedId) ?? null;
+
+  // Load image from IndexedDB when selection changes
   useEffect(() => {
-    (async () => {
-      const [imgBefore, imgAfter, imgDaily] = await Promise.all([
-        imgLoad(weekImgKey(weekStart, "monthly")),
-        imgLoad(weekImgKey(weekStart, "weekly")),
-        imgLoad(weekImgKey(weekStart, "daily")),
-      ]);
-      if (imgBefore || imgAfter || imgDaily) {
-        setEntries(prev => ({
-          ...prev,
-          [weekStart]: { ...(prev[weekStart] ?? BLANK(weekStart)), imgBefore, imgAfter, imgDaily },
-        }));
-      }
-    })();
-  }, [weekStart]);
+    setImage(null);
+    if (!selectedId) return;
+    let alive = true;
+    imgLoad(outlookImgKey(selectedId)).then(img => { if (alive) setImage(img); }).catch(() => {});
+    return () => { alive = false; };
+  }, [selectedId]);
 
-  const entry: WeeklyEntry = entries[weekStart] ?? BLANK(weekStart);
-
-  function save(patch: Partial<WeeklyEntry>) {
-    // Save images to IndexedDB, strip them from localStorage
-    if (patch.imgBefore !== undefined) imgSave(weekImgKey(weekStart, "monthly"), patch.imgBefore).catch(() => {});
-    if (patch.imgAfter  !== undefined) imgSave(weekImgKey(weekStart, "weekly"),  patch.imgAfter).catch(() => {});
-    if (patch.imgDaily  !== undefined) imgSave(weekImgKey(weekStart, "daily"),   patch.imgDaily).catch(() => {});
-
-    const updated = { ...entries, [weekStart]: { ...entry, ...patch } };
-    setEntries(updated);
-    const slimEntries = Object.fromEntries(
-      Object.entries(updated).map(([k, v]) => {
-        const { imgBefore: _b, imgAfter: _a, imgDaily: _d, ...rest } = v;
-        return [k, rest];
-      })
-    );
-    try { localStorage.setItem(WEEKLY_KEY, JSON.stringify(slimEntries)); } catch {}
+  function persist(next: OutlookEntry[]) {
+    setEntries(next);
+    try { localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch {}
   }
 
-  function savePairsList(list: string[]) {
-    setSavedPairs(list);
-    localStorage.setItem(SAVED_PAIRS_KEY, JSON.stringify(list));
+  function update(patch: Partial<OutlookEntry>) {
+    if (!entry) return;
+    persist(entries.map(e => e.id === entry.id ? { ...e, ...patch } : e));
   }
 
-  function readImg(key: "imgBefore" | "imgAfter" | "imgDaily", file: File | null | undefined) {
-    if (!file || !file.type.startsWith("image/")) return;
+  function addEntry() {
+    const e = newEntry();
+    persist([e, ...entries]);
+    setSelectedId(e.id);
+  }
+
+  function removeEntry(id: string) {
+    imgDelete(outlookImgKey(id)).catch(() => {});
+    const next = entries.filter(e => e.id !== id);
+    persist(next);
+    if (selectedId === id) setSelectedId(next[0]?.id ?? null);
+  }
+
+  function readImg(file: File | null | undefined) {
+    if (!entry || !file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
-    reader.onload = ev => save({ [key]: ev.target?.result as string });
+    reader.onload = ev => {
+      const url = ev.target?.result as string;
+      setImage(url);
+      imgSave(outlookImgKey(entry.id), url).catch(() => {});
+      update({ hasImage: true });
+    };
     reader.readAsDataURL(file);
   }
 
-  function onPaste(key: "imgBefore" | "imgAfter" | "imgDaily") {
-    return (e: React.ClipboardEvent) => {
-      for (const item of Array.from(e.clipboardData.items)) {
-        if (item.type.startsWith("image/")) {
-          readImg(key, item.getAsFile()); e.preventDefault(); break;
-        }
-      }
-    };
+  function removeImg() {
+    if (!entry) return;
+    setImage(null);
+    imgDelete(outlookImgKey(entry.id)).catch(() => {});
+    update({ hasImage: false });
   }
 
-  function dataURLtoBlob(dataURL: string) {
-    const [header, base64] = dataURL.split(",");
-    const mime = header.match(/:(.*?);/)![1];
-    const binary = atob(base64);
-    const arr = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i);
-    return new Blob([arr], { type: mime });
-  }
+  const toggleIn = (list: string[], v: string) =>
+    list.includes(v) ? list.filter(x => x !== v) : [...list, v];
 
-  async function sendDiscord() {
-    const webhook = localStorage.getItem(DISCORD_KEY);
-    if (!webhook) return alert("Set your Discord webhook in Admin → Notification Settings first.");
-    setDiscord("sending");
-    const label = `Week of ${formatWeek(weekStart)}`;
-    const biasLines = Object.entries(entry.biases)
-      .filter(([, b]) => b !== "NEUTRAL")
-      .map(([pair, b]) => `• ${pair}: ${b}`)
-      .join("\n") || "No biases set.";
+  const sorted   = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  const filtered = sorted.filter(e =>
+    (!filterPair || e.pair === filterPair) &&
+    (!filterBias || e.bias === filterBias)
+  );
+  const pairOptions = Array.from(new Set([...PAIRS, ...entries.map(e => e.pair)]));
 
-    const embed = {
-      title: `📊 ${label}`,
-      color: entry.done ? 0x00FF7F : 0x6AECE1,
-      fields: [
-        entry.bias  ? { name: "📋 Overall Bias", value: entry.bias,  inline: true } : null,
-        entry.pair  ? { name: "💱 Focus Pair",  value: entry.pair,  inline: true } : null,
-        entry.dol   ? { name: "🎯 DOL",         value: entry.dol,   inline: true } : null,
-        { name: "📈 Pair Biases", value: biasLines, inline: false },
-        entry.keyLevels   ? { name: "🔑 Key Levels",   value: entry.keyLevels,   inline: false } : null,
-        entry.newsEvents  ? { name: "📰 News Events",  value: entry.newsEvents,  inline: false } : null,
-        entry.confluences ? { name: "⚡ Confluences",  value: entry.confluences, inline: false } : null,
-        entry.gamePlan    ? { name: "📝 Game Plan",    value: entry.gamePlan,    inline: false } : null,
-        entry.notes       ? { name: "💬 Notes",        value: entry.notes,       inline: false } : null,
-      ].filter(Boolean) as object[],
-      ...(entry.imgBefore ? { thumbnail: { url: "attachment://before.png" } } : {}),
-      ...(entry.imgAfter  ? { image:     { url: "attachment://after.png"  } } : {}),
-      footer: { text: `Sabar System · Weekly Outlook${entry.done ? " · ✅ Week Complete" : ""}` },
-      timestamp: new Date().toISOString(),
-    };
+  const selectCls = "px-3 py-2 rounded-lg font-sans text-xs text-white focus:outline-none";
+  const selectStyle = { background: "#141414", border: "1px solid #2A2A2A" };
 
-    try {
-      const form = new FormData();
-      form.append("payload_json", JSON.stringify({ username: "Sabar System", embeds: [embed] }));
-      if (entry.imgBefore) form.append("files[0]", dataURLtoBlob(entry.imgBefore), "before.png");
-      if (entry.imgAfter)  form.append("files[1]", dataURLtoBlob(entry.imgAfter),  "after.png");
-      const res = await fetch(webhook, { method: "POST", body: form });
-      setDiscord(res.ok || res.status === 204 ? "sent" : "error");
-    } catch { setDiscord("error"); }
-    setTimeout(() => setDiscord("idle"), 3000);
-  }
-
-  const isCurrentWeek = weekStart === todayWeek;
+  if (!loaded) return null;
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-5">
+    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 pb-10">
 
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: "rgba(106,236,225,0.12)", border: "1px solid rgba(106,236,225,0.3)" }}>
-            <TrendingUp size={20} style={{ color: "#6AECE1" }} />
-          </div>
-          <div>
-            <h1 className="font-mono font-bold text-white text-lg uppercase tracking-widest">Weekly Outlook</h1>
-            <p className="font-mono text-[10px] text-[#444] uppercase tracking-widest">Market Analysis · {formatWeek(weekStart)}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setWeekStart(w => offsetWeek(w, -1))}
-            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[#1A1A1A]"
-            style={{ border: "1px solid #222", color: "#555" }}>
-            <ChevronLeft size={14} />
-          </button>
-          {!isCurrentWeek && (
-            <button onClick={() => setWeekStart(todayWeek)}
-              className="px-3 py-1.5 rounded-lg font-mono text-xs"
-              style={{ background: "rgba(106,236,225,0.1)", border: "1px solid rgba(106,236,225,0.25)", color: "#6AECE1" }}>
-              This Week
-            </button>
-          )}
-          {entry.done && (
-            <span className="px-3 py-1.5 rounded-lg font-mono text-xs font-bold"
-              style={{ background: "rgba(0,255,127,0.1)", border: "1px solid rgba(0,255,127,0.25)", color: "#00FF7F" }}>
-              ✓ Complete
-            </span>
-          )}
-          <button onClick={() => setWeekStart(w => offsetWeek(w, 1))}
-            className="w-8 h-8 flex items-center justify-center rounded-lg transition-colors hover:bg-[#1A1A1A]"
-            style={{ border: "1px solid #222", color: "#555" }}>
-            <ChevronRight size={14} />
+      {/* ── LEFT: entry list ── */}
+      <div className="rounded-2xl p-4 h-fit" style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="font-sans font-bold text-white text-lg">Weekly Outlook</h1>
+          <button onClick={addEntry}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl font-sans text-sm font-bold text-white transition-all hover:opacity-90"
+            style={{ background: RED, boxShadow: `0 0 14px 2px ${RED}44` }}>
+            <Plus size={15} strokeWidth={3} /> New
           </button>
         </div>
+
+        {/* Filters */}
+        <div className="flex gap-2 mb-4">
+          <select className={`${selectCls} flex-1`} style={selectStyle}
+            value={filterPair} onChange={e => setFilterPair(e.target.value)}>
+            <option value="">All Pairs</option>
+            {pairOptions.map(p => <option key={p} value={p}>{p}</option>)}
+          </select>
+          <select className={`${selectCls} flex-1`} style={selectStyle}
+            value={filterBias} onChange={e => setFilterBias(e.target.value)}>
+            <option value="">All Bias</option>
+            <option value="BULLISH">Bullish</option>
+            <option value="BEARISH">Bearish</option>
+            <option value="NEUTRAL">Neutral</option>
+          </select>
+        </div>
+
+        {/* Entry list */}
+        {filtered.length === 0 ? (
+          <p className="font-sans text-sm text-center py-8" style={{ color: "#666" }}>
+            No outlooks yet — hit <span style={{ color: RED }}>+ New</span>
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {filtered.map(e => {
+              const active = e.id === selectedId;
+              const meta = BIAS_META[e.bias];
+              return (
+                <button key={e.id} onClick={() => setSelectedId(e.id)}
+                  className="w-full text-left rounded-xl px-4 py-3 transition-all duration-200 border"
+                  style={active
+                    ? { background: "rgba(239,68,68,0.07)", borderColor: `${RED}66`, boxShadow: `0 0 14px 1px ${RED}22` }
+                    : { background: "rgba(255,255,255,0.02)", borderColor: "#222" }}>
+                  <div className="flex items-center justify-between">
+                    <span className="font-sans font-bold text-white text-sm">{weekday(e.date)}</span>
+                    <span className="w-2 h-2 rounded-full shrink-0"
+                      style={{ background: meta.color, boxShadow: `0 0 6px 1px ${meta.color}88` }} />
+                  </div>
+                  <p className="font-sans text-[11px] mt-0.5" style={{ color: "#777" }}>{e.date}</p>
+                  <div className="flex items-center gap-1.5 mt-2 flex-wrap">
+                    <span className="px-2 py-0.5 rounded-md font-sans text-[10px] font-semibold"
+                      style={{ background: "#1C1C1C", border: "1px solid #2E2E2E", color: "#C0C0C0" }}>
+                      {e.pair}
+                    </span>
+                    <span className="px-2 py-0.5 rounded-md font-sans text-[10px] font-semibold"
+                      style={{ background: `${meta.color}14`, border: `1px solid ${meta.color}44`, color: meta.color }}>
+                      {meta.label}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      {/* ── RIGHT: detail panel ── */}
+      {entry ? (
+        <div className="rounded-2xl p-6 space-y-6" style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>
 
-        {/* LEFT */}
-        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3 pb-4 border-b" style={{ borderColor: "#222" }}>
+            <div>
+              <h2 className="font-sans font-bold text-white text-xl">
+                {weekday(entry.date)} <span style={{ color: "#666" }}>— {entry.date}</span>
+              </h2>
+              <p className="font-sans text-xs mt-1" style={{ color: "#8A8A8A" }}>Weekly market outlook &amp; game plan</p>
+            </div>
+            <button onClick={() => removeEntry(entry.id)}
+              className="p-2 rounded-lg transition-colors hover:bg-[#EF444414]"
+              style={{ border: "1px solid #2A2A2A", color: "#666" }}
+              title="Delete outlook">
+              <Trash2 size={15} />
+            </button>
+          </div>
 
-          {/* Overall Bias */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Overall Weekly Bias</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { k: "BULLISH", label: "▲ Bullish", active: "rgba(0,255,127,0.15)", activeB: "rgba(0,255,127,0.4)", activeC: "#00FF7F" },
-                { k: "BEARISH", label: "▼ Bearish", active: "rgba(255,59,59,0.15)", activeB: "rgba(255,59,59,0.4)",  activeC: "#FF3B3B" },
-                { k: "RANGING", label: "↔ Ranging", active: "rgba(245,158,11,0.15)",activeB: "rgba(245,158,11,0.4)", activeC: "#F59E0B" },
-              ].map(({ k, label, active, activeB, activeC }) => (
-                <button key={k} onClick={() => save({ bias: entry.bias === k ? null : k as WeeklyEntry["bias"] })}
-                  className="py-2.5 rounded-xl font-mono text-xs font-bold transition-all"
-                  style={{
-                    background: entry.bias === k ? active : "#111",
-                    border:     `1px solid ${entry.bias === k ? activeB : "#1A1A1A"}`,
-                    color:      entry.bias === k ? activeC : "#333",
-                    boxShadow:  entry.bias === k ? `0 0 12px 1px ${active}` : "none",
-                  }}>
-                  {label}
-                </button>
-              ))}
+          {/* Pair + Date */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="font-sans text-sm font-medium mb-2" style={{ color: "#A0A0A0" }}>Pair</p>
+              <input list="outlook-pairs" value={entry.pair}
+                onChange={e => update({ pair: e.target.value.toUpperCase() })}
+                className="w-full font-sans text-sm text-white px-4 py-3 rounded-xl focus:outline-none placeholder-[#555]"
+                style={{ background: "#101010", border: "1px solid #262626" }} />
+              <datalist id="outlook-pairs">
+                {pairOptions.map(p => <option key={p} value={p} />)}
+              </datalist>
+            </div>
+            <div>
+              <p className="font-sans text-sm font-medium mb-2" style={{ color: "#A0A0A0" }}>Date</p>
+              <input type="date" value={entry.date}
+                onChange={e => { if (e.target.value) update({ date: e.target.value }); }}
+                className="w-full font-sans text-sm text-white px-4 py-3 rounded-xl focus:outline-none"
+                style={{ background: "#101010", border: "1px solid #262626", colorScheme: "dark" }} />
             </div>
           </div>
 
-          {/* Focus Pair */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Focus Pair</p>
-            <div className="flex flex-wrap gap-2">
-              {savedPairs.map(p => (
-                <div key={p} className="group relative">
-                  <button onClick={() => save({ pair: entry.pair === p ? null : p })}
-                    className="font-mono text-xs font-bold pl-3 pr-6 py-1.5 rounded-lg transition-all"
-                    style={{
-                      background: entry.pair === p ? "rgba(106,236,225,0.15)" : "#111",
-                      border:     `1px solid ${entry.pair === p ? "rgba(106,236,225,0.4)" : "#1A1A1A"}`,
-                      color:      entry.pair === p ? "#6AECE1" : "#555",
-                    }}>
-                    {p}
+          {/* Bias */}
+          <div>
+            <p className="font-sans text-sm font-medium mb-2" style={{ color: "#A0A0A0" }}>Bias</p>
+            <div className="grid grid-cols-3 gap-3">
+              {(Object.keys(BIAS_META) as OutlookBias[]).map(b => {
+                const { label, color, Icon } = BIAS_META[b];
+                const active = entry.bias === b;
+                return (
+                  <button key={b} onClick={() => update({ bias: b })}
+                    className="flex items-center justify-center gap-2 py-3 rounded-xl font-sans font-semibold text-sm transition-all duration-200 border"
+                    style={active
+                      ? { color: b === "NEUTRAL" ? "#fff" : "#fff", borderColor: color,
+                          background: `${color}1F`, boxShadow: `0 0 16px 2px ${color}33` }
+                      : { color: "#8A8A8A", borderColor: "#2A2A2A", background: "rgba(255,255,255,0.02)" }}>
+                    <Icon size={16} strokeWidth={2.5} style={{ color: active ? color : "#8A8A8A" }} />
+                    {label}
                   </button>
-                  <button
-                    onClick={() => { savePairsList(savedPairs.filter(x => x !== p)); if (entry.pair === p) save({ pair: null }); }}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-[#333] hover:text-[#FF3B3B] opacity-0 group-hover:opacity-100 transition-opacity text-xs">
-                    ×
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
-            <div className="flex gap-2">
-              <input type="text" value={pairInput} placeholder="Add pair… EUR/USD"
-                onChange={e => setPairInput(e.target.value.toUpperCase())}
-                onKeyDown={e => {
-                  if (e.key === "Enter" && pairInput.trim()) {
-                    const v = pairInput.trim();
-                    if (!savedPairs.includes(v)) savePairsList([...savedPairs, v]);
-                    save({ pair: v }); setPairInput("");
-                  }
-                }}
-                className="flex-1 px-3 py-2 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none"
-                style={{ background: "#111", border: "1px solid #1A1A1A" }} />
-              <button onClick={() => {
-                const v = pairInput.trim();
-                if (!v) return;
-                if (!savedPairs.includes(v)) savePairsList([...savedPairs, v]);
-                save({ pair: v }); setPairInput("");
-              }} className="px-3 py-2 rounded-lg font-mono text-xs font-bold"
-                style={{ background: "#111", border: "1px solid rgba(106,236,225,0.2)", color: "#6AECE1" }}>
-                + Add
+          </div>
+
+          {/* Sessions */}
+          <div>
+            <p className="font-sans text-sm font-medium mb-2" style={{ color: "#A0A0A0" }}>Sessions</p>
+            <div className="flex flex-wrap gap-2.5">
+              {SESSIONS.map(s => {
+                const active = entry.sessions.includes(s);
+                return (
+                  <button key={s} onClick={() => update({ sessions: toggleIn(entry.sessions, s) })}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-full font-sans text-sm font-medium border transition-all duration-200"
+                    style={active
+                      ? { color: AMBER, borderColor: AMBER, background: `${AMBER}14`, boxShadow: `0 0 12px 1px ${AMBER}33` }
+                      : { color: "#B0B0B0", borderColor: "#2E2E2E", background: "#161616" }}>
+                    <MapPin size={13} style={{ color: active ? AMBER : "#8A8A8A" }} />
+                    {s}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Timeframes */}
+          <div>
+            <p className="font-sans text-sm font-medium mb-2" style={{ color: "#A0A0A0" }}>Timeframes</p>
+            <div className="flex flex-wrap gap-2.5">
+              {TIMEFRAMES.map(tf => {
+                const active = entry.timeframes.includes(tf);
+                return (
+                  <button key={tf} onClick={() => update({ timeframes: toggleIn(entry.timeframes, tf) })}
+                    className="px-4 py-2 rounded-full font-sans text-sm font-medium border transition-all duration-200"
+                    style={active
+                      ? { color: GREEN, borderColor: GREEN, background: `${GREEN}14`, boxShadow: `0 0 12px 1px ${GREEN}33` }
+                      : { color: "#B0B0B0", borderColor: "#2E2E2E", background: "#161616" }}>
+                    {tf}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Confidence */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Confidence</p>
+              <p className="font-sans text-sm font-bold" style={{ color: RED }}>{entry.confidence}%</p>
+            </div>
+            <input type="range" min={0} max={100} step={5} value={entry.confidence}
+              onChange={e => update({ confidence: Number(e.target.value) })}
+              className="w-full"
+              style={{ accentColor: RED }} />
+          </div>
+
+          {/* Weekly bias note */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Weekly Bias</p>
+              <VoiceMic onText={t => update({ biasNote: appendNote(entry.biasNote, t) })} />
+            </div>
+            <input value={entry.biasNote}
+              onChange={e => update({ biasNote: e.target.value })}
+              placeholder="One-line weekly bias..."
+              className="w-full font-sans text-sm text-white px-4 py-3 rounded-xl focus:outline-none placeholder-[#555]"
+              style={{ background: "#101010", border: "1px solid #262626" }} />
+          </div>
+
+          {/* Analysis */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Analysis / Game Plan</p>
+              <VoiceMic onText={t => update({ analysis: appendNote(entry.analysis, t) })} />
+            </div>
+            <textarea value={entry.analysis}
+              onChange={e => update({ analysis: e.target.value })}
+              placeholder="Full analysis — setups to watch, key levels, news, rules..."
+              rows={4}
+              className="w-full font-sans text-sm text-white px-4 py-3 rounded-xl focus:outline-none placeholder-[#555] resize-none leading-relaxed"
+              style={{ background: "#101010", border: "1px solid #262626" }} />
+          </div>
+
+          {/* Chart image */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={15} style={{ color: RED }} />
+                <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Chart / Image</p>
+              </div>
+              <button onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-sans text-xs font-semibold transition-all hover:opacity-80"
+                style={{ color: RED, border: `1px solid ${RED}44`, background: `${RED}0D` }}>
+                <Plus size={12} /> Add Image
               </button>
             </div>
-          </div>
 
-          {/* DOL */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Draw on Liquidity (DOL)</p>
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { k: "BSL",   label: "BSL",   sub: "Buyside",  activeC: "#00FF7F", activeBg: "rgba(0,255,127,0.15)",  activeB: "rgba(0,255,127,0.4)"  },
-                { k: "SSL",   label: "SSL",   sub: "Sellside", activeC: "#FF3B3B", activeBg: "rgba(255,59,59,0.15)",  activeB: "rgba(255,59,59,0.4)"  },
-                { k: "MIXED", label: "Mixed", sub: "Both",     activeC: "#F59E0B", activeBg: "rgba(245,158,11,0.15)", activeB: "rgba(245,158,11,0.4)" },
-              ].map(({ k, label, sub, activeC, activeBg, activeB }) => (
-                <button key={k} onClick={() => save({ dol: entry.dol === k ? null : k as WeeklyEntry["dol"] })}
-                  className="py-3 rounded-xl flex flex-col items-center gap-0.5 font-mono transition-all"
-                  style={{
-                    background: entry.dol === k ? activeBg : "#111",
-                    border:     `1px solid ${entry.dol === k ? activeB : "#1A1A1A"}`,
-                    color:      entry.dol === k ? activeC : "#333",
-                  }}>
-                  <span className="text-sm font-black">{label}</span>
-                  <span className="text-[9px] opacity-70">{sub}</span>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden"
+              onChange={e => { readImg(e.target.files?.[0]); e.target.value = ""; }} />
+
+            {image ? (
+              <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
+                <img src={image} alt="Chart" className="w-full object-contain" style={{ maxHeight: 420, background: "#0A0A0A" }} />
+                <button onClick={removeImg}
+                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#EF4444]">
+                  <X size={13} />
                 </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Chart Screenshots — Monthly / Weekly / Daily */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center gap-2">
-              <ImageIcon size={13} style={{ color: "#6AECE1" }} />
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Chart Screenshots</p>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {([
-                { key: "imgBefore" as "imgBefore"|"imgAfter"|"imgDaily", label: "MONTHLY", sub: "1M", color: "#F59E0B", ref: fileRefMonthly },
-                { key: "imgAfter"  as "imgBefore"|"imgAfter"|"imgDaily", label: "WEEKLY",  sub: "1W", color: "#6AECE1", ref: fileRefWeekly  },
-                { key: "imgDaily"  as "imgBefore"|"imgAfter"|"imgDaily", label: "DAILY",   sub: "1D", color: "#00FF7F", ref: fileRefDaily   },
-              ]).map(({ key, label, sub, color, ref }) => (
-                <div key={key} className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-[9px] font-black uppercase tracking-widest" style={{ color }}>{label}</span>
-                    <span className="font-mono text-[8px]" style={{ color: "#333" }}>{sub}</span>
-                  </div>
-                  {entry[key] ? (
-                    <div className="relative group rounded-lg overflow-hidden" style={{ border: "1px solid #1A1A1A" }}>
-                      <img src={entry[key]!} alt={label} className="w-full object-cover rounded-lg" style={{ maxHeight: 130 }} />
-                      <button onClick={() => save({ [key]: null })}
-                        className="absolute top-1.5 right-1.5 p-1 rounded bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#FF3B3B]">
-                        <X size={11} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div tabIndex={0}
-                      onPaste={onPaste(key)}
-                      onDrop={e => { e.preventDefault(); setDragOver(null); readImg(key, e.dataTransfer.files?.[0]); }}
-                      onDragOver={e => { e.preventDefault(); setDragOver(key); }}
-                      onDragLeave={() => setDragOver(null)}
-                      onClick={() => ref.current?.click()}
-                      className="flex flex-col items-center justify-center gap-1.5 rounded-lg cursor-pointer transition-all py-6 focus:outline-none"
-                      style={{
-                        border: `2px dashed ${dragOver === key ? color : "#1A1A1A"}`,
-                        background: dragOver === key ? `${color}08` : "#111",
-                      }}>
-                      <Upload size={14} style={{ color: "#333" }} />
-                      <span className="font-mono text-[8px] font-bold" style={{ color: "#333" }}>Click or Paste</span>
-                      <span className="font-mono text-[7px]" style={{ color: "#222" }}>Ctrl+V · Drop</span>
-                    </div>
-                  )}
-                  <input ref={ref} type="file" accept="image/*" className="hidden"
-                    onChange={e => readImg(key, e.target.files?.[0])} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <FileText size={13} style={{ color: "#F59E0B" }} />
-                <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Weekly Notes</p>
               </div>
-              <VoiceMic onText={t => save({ notes: appendNote(entry.notes, t) })} />
-            </div>
-            <textarea value={entry.notes} onChange={e => save({ notes: e.target.value })}
-              placeholder="Overall narrative, expectations, what to look for this week..."
-              rows={4}
-              className="w-full bg-transparent font-sans text-sm text-white placeholder-[#333] focus:outline-none resize-none leading-relaxed" />
+            ) : (
+              <div tabIndex={0}
+                onPaste={e => {
+                  const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith("image/"));
+                  if (item) { readImg(item.getAsFile()); e.preventDefault(); }
+                }}
+                onDrop={e => { e.preventDefault(); setDragOver(false); readImg(e.dataTransfer.files?.[0]); }}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onClick={() => fileRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all py-10 focus:outline-none border-2 border-dashed"
+                style={{
+                  borderColor: dragOver ? RED : "#2A2A2A",
+                  background: dragOver ? `${RED}08` : "rgba(255,255,255,0.02)",
+                }}>
+                <Upload size={22} style={{ color: "#555" }} />
+                <p className="font-sans text-sm" style={{ color: "#8A8A8A" }}>Click, paste (Ctrl+V) or drag &amp; drop</p>
+                <p className="font-sans text-xs" style={{ color: "#555" }}>Chart screenshot for this outlook</p>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* RIGHT */}
-        <div className="space-y-4">
-
-          {/* Key Levels */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#F59E0B" }}>Key Levels</p>
-              <VoiceMic onText={t => save({ keyLevels: appendNote(entry.keyLevels, t) })} />
-            </div>
-            <textarea value={entry.keyLevels} onChange={e => save({ keyLevels: e.target.value })}
-              placeholder="Support & resistance levels to watch this week..."
-              rows={4}
-              className="w-full bg-transparent font-sans text-xs text-white placeholder-[#333] focus:outline-none resize-none leading-relaxed" />
-          </div>
-
-          {/* News Events */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#FF3B3B" }}>News Events</p>
-              <VoiceMic onText={t => save({ newsEvents: appendNote(entry.newsEvents, t) })} />
-            </div>
-            <textarea value={entry.newsEvents} onChange={e => save({ newsEvents: e.target.value })}
-              placeholder="High impact news: FOMC, NFP, CPI — dates & times..."
-              rows={4}
-              className="w-full bg-transparent font-sans text-xs text-white placeholder-[#333] focus:outline-none resize-none leading-relaxed" />
-          </div>
-
-          {/* Confluences */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#6AECE1" }}>Confluences</p>
-              <VoiceMic onText={t => save({ confluences: appendNote(entry.confluences, t) })} />
-            </div>
-            <textarea value={entry.confluences} onChange={e => save({ confluences: e.target.value })}
-              placeholder="Technical confluences, ICT concepts, structure..."
-              rows={4}
-              className="w-full bg-transparent font-sans text-xs text-white placeholder-[#333] focus:outline-none resize-none leading-relaxed" />
-          </div>
-
-          {/* Game Plan */}
-          <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#00FF7F" }}>Weekly Game Plan</p>
-              <VoiceMic onText={t => save({ gamePlan: appendNote(entry.gamePlan, t) })} />
-            </div>
-            <textarea value={entry.gamePlan} onChange={e => save({ gamePlan: e.target.value })}
-              placeholder="Full weekly game plan — setups to watch, rules, risk limits..."
-              rows={5}
-              className="w-full bg-transparent font-sans text-xs text-white placeholder-[#333] focus:outline-none resize-none leading-relaxed" />
-          </div>
-        </div>
-      </div>
-
-      {/* News Alarms */}
-      <NewsAlarms />
-
-      {/* Mark Complete */}
-      <button onClick={() => save({ done: !entry.done })}
-        className="w-full py-4 rounded-xl font-mono font-black text-sm tracking-widest transition-all"
-        style={{
-          background: entry.done ? "rgba(0,255,127,0.12)" : "transparent",
-          border:     `2px ${entry.done ? "solid" : "dashed"} ${entry.done ? "#00FF7F" : "#1A1A1A"}`,
-          color:      entry.done ? "#00FF7F" : "#333",
-        }}>
-        {entry.done ? "✓ WEEK COMPLETE" : "+ MARK WEEK COMPLETE"}
-      </button>
-
-      {/* Discord Settings Panel */}
-      {showDiscordSettings && (
-        <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid rgba(88,101,242,0.3)" }}>
-          <div className="flex items-center justify-between">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest" style={{ color: "#5865F2" }}>Discord Webhook</p>
-            <button onClick={() => setShowDiscordSettings(false)} style={{ color: "#333" }}><X size={13} /></button>
-          </div>
-          <p className="font-sans text-[10px]" style={{ color: "#444" }}>
-            Paste your Discord webhook URL to send weekly outlook summaries to a channel.
-          </p>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={webhookInput}
-              onChange={e => setWebhookInput(e.target.value)}
-              placeholder="https://discord.com/api/webhooks/..."
-              className="flex-1 px-3 py-2.5 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none"
-              style={{ background: "#111", border: "1px solid #222" }}
-            />
-            <button
-              onClick={() => {
-                localStorage.setItem(DISCORD_KEY, webhookInput.trim());
-                setWebhookSaved(true);
-                setTimeout(() => { setWebhookSaved(false); setShowDiscordSettings(false); }, 1500);
-              }}
-              className="px-4 py-2.5 rounded-lg font-mono text-xs font-bold transition-all"
-              style={{
-                background: webhookSaved ? "rgba(0,255,127,0.15)" : "rgba(88,101,242,0.15)",
-                border: `1px solid ${webhookSaved ? "rgba(0,255,127,0.35)" : "rgba(88,101,242,0.35)"}`,
-                color: webhookSaved ? "#00FF7F" : "#5865F2",
-              }}>
-              {webhookSaved ? <><Check size={12} /> Saved</> : "Save"}
-            </button>
-          </div>
-          {webhookInput && (
-            <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full" style={{ background: "#00FF7F" }} />
-              <span className="font-mono text-[9px]" style={{ color: "#00FF7F" }}>Webhook connected</span>
-            </div>
-          )}
+      ) : (
+        <div className="rounded-2xl flex flex-col items-center justify-center gap-3 py-24"
+          style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>
+          <p className="font-sans text-base" style={{ color: "#8A8A8A" }}>No outlook selected</p>
+          <button onClick={addEntry}
+            className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-sans text-sm font-bold text-white transition-all hover:opacity-90"
+            style={{ background: RED, boxShadow: `0 0 14px 2px ${RED}44` }}>
+            <Plus size={15} strokeWidth={3} /> New Outlook
+          </button>
         </div>
       )}
-
-      {/* Bottom row: Save + Discord */}
-      <div className="grid grid-cols-2 gap-3">
-        <button onClick={() => { const slim = Object.fromEntries(Object.entries(entries).map(([k,v]) => { const {imgBefore:_b,imgAfter:_a,imgDaily:_d,...r}=v; return [k,r]; })); try { localStorage.setItem(WEEKLY_KEY, JSON.stringify(slim)); } catch {} setSaveFeedback(true); setTimeout(() => setSaveFeedback(false), 2000); }}
-          className="py-3 rounded-xl font-mono text-sm font-bold flex items-center justify-center gap-2 transition-all"
-          style={{
-            background: saveFeedback ? "rgba(0,255,127,0.15)" : "rgba(106,236,225,0.1)",
-            border:     `1px solid ${saveFeedback ? "rgba(0,255,127,0.35)" : "rgba(106,236,225,0.25)"}`,
-            color:      saveFeedback ? "#00FF7F" : "#6AECE1",
-          }}>
-          {saveFeedback ? <><Check size={14} /> Saved</> : "Save Outlook"}
-        </button>
-
-        <div className="flex gap-1">
-          <button onClick={sendDiscord} disabled={discord === "sending"}
-            className="flex-1 py-3 rounded-xl font-mono text-sm font-bold flex items-center justify-center gap-2 transition-all disabled:opacity-50"
-            style={{
-              background: discord === "sent"  ? "rgba(0,255,127,0.12)" : discord === "error" ? "rgba(255,59,59,0.12)" : "rgba(88,101,242,0.1)",
-              border:     `1px solid ${discord === "sent" ? "rgba(0,255,127,0.3)" : discord === "error" ? "rgba(255,59,59,0.3)" : "rgba(88,101,242,0.3)"}`,
-              color:      discord === "sent"  ? "#00FF7F" : discord === "error" ? "#FF3B3B" : "#5865F2",
-            }}>
-            <Send size={14} />
-            {discord === "sending" ? "Sending…" : discord === "sent" ? "Sent!" : discord === "error" ? "Failed" : "Send to Discord"}
-          </button>
-          <button onClick={() => setShowDiscordSettings(v => !v)}
-            className="px-3 rounded-xl transition-all"
-            style={{
-              background: showDiscordSettings ? "rgba(88,101,242,0.2)" : "rgba(88,101,242,0.08)",
-              border: `1px solid ${showDiscordSettings ? "rgba(88,101,242,0.5)" : "rgba(88,101,242,0.25)"}`,
-              color: "#5865F2",
-            }}>
-            <Settings size={14} />
-          </button>
-        </div>
-      </div>
-
     </div>
   );
 }

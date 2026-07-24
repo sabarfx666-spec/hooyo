@@ -311,7 +311,7 @@ export default function ProfilePage() {
 
   // Session breakdown
   const sessionMap = taken.reduce((acc, t) => {
-    const s = t.session === "LONDON" ? "London" : "New York";
+    const s = t.session === "ASIAN" ? "Asian" : t.session === "LONDON" ? "London" : "New York";
     if (!acc[s]) acc[s] = { wins: 0, losses: 0, total: 0, r: 0 };
     acc[s].total++;
     if (t.outcome === "WIN")  { acc[s].wins++;   acc[s].r += (t.rr ?? 0); }

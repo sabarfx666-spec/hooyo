@@ -15,6 +15,18 @@ html, body {
   color: #ffffff;
 }
 
+/* Red-tinted grid backdrop (target design) */
+body {
+  background:
+    radial-gradient(1100px 550px at 85% -10%, rgba(239,68,68,0.10), transparent 65%),
+    radial-gradient(900px 500px at -10% 110%, rgba(239,68,68,0.07), transparent 60%),
+    linear-gradient(rgba(239,68,68,0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(239,68,68,0.045) 1px, transparent 1px),
+    #070707 !important;
+  background-size: auto, auto, 44px 44px, 44px 44px, auto;
+  background-attachment: fixed;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -41,6 +53,18 @@ button {
 
 button:active {
   transform: scale(0.93) !important;
+}
+
+/* Hide number-input spinner arrows (all browsers) */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
 }
 
 /* Range input thumb press */
@@ -120,6 +144,11 @@ input[type="range"]::-webkit-slider-thumb:active {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
 }
+@keyframes sweepX {
+  0%   { transform: translateX(-25%); }
+  50%  { transform: translateX(25%); }
+  100% { transform: translateX(-25%); }
+}
 
 /* ── Utility animation classes ── */
 .anim-fade-up       { animation: fadeInUp   0.55s cubic-bezier(0.34,1.2,0.64,1) both; }
@@ -136,6 +165,7 @@ input[type="range"]::-webkit-slider-thumb:active {
 .anim-glow-amber    { animation: borderGlowAmber 2.2s ease-in-out infinite; }
 .anim-glow-orange   { animation: borderGlowOrange 2.2s ease-in-out infinite; }
 .anim-spin-slow     { animation: spinSlow 8s linear infinite; }
+.anim-sweep         { animation: sweepX 2.8s ease-in-out infinite; will-change: transform; }
 
 /* Stagger delays */
 .d-0   { animation-delay: 0s; }

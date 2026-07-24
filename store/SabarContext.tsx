@@ -179,8 +179,10 @@ function reducer(state: SabarState, action: Action): SabarState {
       const missingRules = activeRules.filter((r) => !r.checked);
       const totalPnl = state.trades.reduce((s, t) => s + (t.pnl ?? 0), 0);
       const currentBalance = state.accountBalance + totalPnl;
+      const now = Date.now();
       const trade: Trade = {
-        id: `trade-${Date.now()}`,
+        id: `trade-${now}`,
+        createdAt: now,
         date: state.selectedDate,
         session: state.currentSession,
         pair: state.currentPair,

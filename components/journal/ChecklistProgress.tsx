@@ -1,12 +1,6 @@
 "use client";
 import { useSabar } from "@/store/SabarContext";
-
-function getGrade(pct: number) {
-  if (pct >= 90) return { letter: "A+", color: "#00FF7F" };
-  if (pct >= 70) return { letter: "B+", color: "#6AECE1" };
-  if (pct >= 50) return { letter: "C-", color: "#F5A623" };
-  return              { letter: "D-", color: "#FF3B3B" };
-}
+import { getGrade } from "@/lib/utils";
 
 export function ChecklistProgress() {
   const { state } = useSabar();
@@ -17,49 +11,18 @@ export function ChecklistProgress() {
   const grade   = getGrade(pct);
 
   return (
-    <div
-      className="relative flex items-center justify-between overflow-hidden"
-      style={{
-        background: "#0A0A0A",
-        border: "1px solid #1A1A1A",
-        borderRadius: "12px",
-        padding: "14px 20px 0px 20px",
-        minHeight: "64px",
-      }}
-    >
-      {/* Left: rule count */}
-      <span className="font-mono text-xs pb-4" style={{ color: "#2A2A2A" }}>
-        {checked}/{total} rules
-      </span>
-
-      {/* Right: percentage + grade */}
-      <div className="flex items-center gap-3 pb-4">
-        <div className="text-right">
-          <p className="font-mono font-bold text-xl leading-none" style={{ color: grade.color }}>{pct}%</p>
-          <p className="font-sans text-[10px] mt-0.5" style={{ color: "#444" }}>Completion</p>
-        </div>
-        {/* Grade badge */}
-        <div
-          className="w-9 h-9 rounded-lg flex items-center justify-center font-mono font-black text-lg"
-          style={{
-            background: `${grade.color}18`,
-            border: `1px solid ${grade.color}55`,
-            color: grade.color,
-            boxShadow: `0 0 12px 2px ${grade.color}33`,
-          }}
-        >
-          {grade.letter}
-        </div>
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-sans text-sm font-medium" style={{ color: "#D0D0D0" }}>Checklist Progress</p>
+        <p className="font-sans text-sm font-bold" style={{ color: grade.color }}>{pct}%</p>
       </div>
-
-      {/* Bottom progress bar — flush to edges */}
-      <div className="absolute bottom-0 left-0 right-0 h-1.5" style={{ background: "#1A1A1A" }}>
+      <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#1E1E1E" }}>
         <div
-          className="h-full transition-all duration-500"
+          className="h-full rounded-full transition-all duration-500"
           style={{
             width: `${pct}%`,
             background: grade.color,
-            boxShadow: `0 0 8px 1px ${grade.color}66`,
+            boxShadow: `0 0 10px 1px ${grade.color}66`,
           }}
         />
       </div>

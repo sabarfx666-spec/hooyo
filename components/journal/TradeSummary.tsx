@@ -5,10 +5,20 @@ import { useSabar } from "@/store/SabarContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { sendTradeToDiscord } from "@/lib/discord";
-import { Send, CheckCircle, XCircle, Settings, Lock, Clock } from "lucide-react";
+import { getGrade } from "@/lib/utils";
+import { SESSION_LABELS } from "@/store/types";
+import { PSYCH_NOTE_KEY } from "@/components/journal/PsychologySelector";
+import {
+  Send, CheckCircle, XCircle, Settings, Lock, Clock,
+  Award, Zap, TrendingUp, TrendingDown, MapPin, CandlestickChart,
+  ListChecks, CheckCircle2,
+} from "lucide-react";
 
 const WEBHOOK_KEY = "sabar-discord-webhook";
 const DAILY_LIMIT = 2;
+
+const GREEN = "#22C55E";
+const RED   = "#EF4444";
 
 function useCountdownToMidnight() {
   const [timeLeft, setTimeLeft] = useState("");
@@ -28,6 +38,25 @@ function useCountdownToMidnight() {
     return () => clearInterval(t);
   }, []);
   return timeLeft;
+}
+
+function StatTile({ icon, label, value, valueColor, tint }: {
+  icon: React.ReactNode; label: string; value: string;
+  valueColor?: string; tint?: string;
+}) {
+  return (
+    <div className="rounded-xl px-4 py-3.5"
+      style={{
+        background: tint ? `${tint}0D` : "rgba(255,255,255,0.02)",
+        border: `1px solid ${tint ? tint + "40" : "#262626"}`,
+      }}>
+      <div className="flex items-center gap-2 mb-1" style={{ color: tint ?? "#8A8A8A" }}>
+        {icon}
+        <span className="font-sans text-xs" style={{ color: "#8A8A8A" }}>{label}</span>
+      </div>
+      <p className="font-sans text-lg font-bold" style={{ color: valueColor ?? "#fff" }}>{value}</p>
+    </div>
+  );
 }
 
 export function TradeSummary() {
@@ -50,16 +79,18 @@ export function TradeSummary() {
   const today            = new Date().toISOString().split("T")[0];
   const todayTakes       = state.trades.filter(t => t.decision === "TAKE" && t.date === today);
   const isLocked         = todayTakes.length >= DAILY_LIMIT && !manualUnlock;
-  const checkedRules     = state.rules.filter(r => r.checked);
-  const totalRules       = state.rules.length;
-  const pct              = totalRules > 0 ? Math.round((checkedRules.length / totalRules) * 100) : 0;
+
+  const biasSet          = state.biasRules?.[state.currentBias] ?? [];
+  const checkedCount     = biasSet.filter(r => r.checked).length;
+  const totalRules       = biasSet.length;
+  const missing          = totalRules - checkedCount;
+  const pct              = totalRules > 0 ? Math.round((checkedCount / totalRules) * 100) : 0;
+  const grade            = getGrade(pct);
+
   const isBull           = state.currentBias === "BULLISH";
-  const biasColor        = isBull ? "#00FF7F" : "#FF3B3B";
-  const biasGlow         = isBull ? "0 0 16px 3px rgba(0,255,127,0.4)" : "0 0 16px 3px rgba(255,59,59,0.4)";
-  const biasAnim         = isBull ? "anim-glow-green" : "anim-glow-red";
+  const biasColor        = isBull ? GREEN : RED;
   const totalPnl         = state.trades.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const currentBalance   = state.accountBalance + totalPnl;
-  const pctColor         = pct === 100 ? "#00FF7F" : pct >= 80 ? "#6AECE1" : pct >= 50 ? "#F59E0B" : "#FF3B3B";
 
   const handleAction = async (type: "TAKE" | "SKIP") => {
     // Read pre-trade proof snapshots from dashboard's ChartSnapshots section
@@ -67,6 +98,7 @@ export function TradeSummary() {
       weekly: "Weekly", daily: "Daily", "4h": "4H", entry: "15M", after: "Result",
     };
     let chartProofs: Record<string, string> | undefined;
+    let psychNote: string | undefined;
     try {
       const raw = localStorage.getItem("sabar-proof-images");
       if (raw) {
@@ -79,11 +111,17 @@ export function TradeSummary() {
         // clear pending proofs after taking trade
         localStorage.removeItem("sabar-proof-images");
       }
+      const note = localStorage.getItem(PSYCH_NOTE_KEY);
+      if (note && note.trim()) { psychNote = note.trim(); localStorage.removeItem(PSYCH_NOTE_KEY); }
     } catch {}
 
     dispatch({
       type: type === "TAKE" ? "TAKE_TRADE" : "SKIP_TRADE",
-      payload: { rr: 0, ...(chartProofs ? { chartProofs } : {}) },
+      payload: {
+        rr: 0,
+        ...(chartProofs ? { chartProofs } : {}),
+        ...(psychNote ? { notes: psychNote } : {}),
+      },
     });
 
     if (webhookUrl && type === "TAKE") {
@@ -92,8 +130,8 @@ export function TradeSummary() {
         await sendTradeToDiscord(webhookUrl, {
           pair: state.currentPair, bias: state.currentBias, session: state.currentSession,
           decision: type, outcome: undefined,
-          pnl: undefined, rr: 0, checkedCount: checkedRules.length, totalRules,
-          notes: undefined, accountBalance: currentBalance,
+          pnl: undefined, rr: 0, checkedCount, totalRules,
+          notes: psychNote, accountBalance: currentBalance,
           riskAmount: (currentBalance * state.riskPercent) / 100,
         });
         setSendStatus("ok");
@@ -112,29 +150,49 @@ export function TradeSummary() {
 
   return (
     <>
+      {/* ── Trade Summary card ── */}
       <div
-        className="shimmer-card relative overflow-hidden rounded-xl p-5 h-full flex flex-col gap-4"
-        style={{ background: "#0D0D0D", border: isLocked ? "1px solid rgba(255,59,59,0.35)" : "1px solid #1A1A1A" }}
+        className="rounded-2xl p-6 space-y-5"
+        style={{
+          background: "rgba(20,20,20,0.6)",
+          border: `1px solid ${isLocked ? "rgba(239,68,68,0.5)" : "rgba(239,68,68,0.35)"}`,
+          boxShadow: "0 0 24px 2px rgba(239,68,68,0.08)",
+        }}
       >
-        {/* Top accent line */}
-        <div className="absolute top-0 left-0 right-0 h-[2px] rounded-t-xl"
-          style={{ background: `linear-gradient(90deg, transparent, ${biasColor}, transparent)`, opacity: 0.5 }} />
-
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h3 className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "#444" }}>Trade Summary</h3>
-          {isLocked && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full" style={{ background: "rgba(255,59,59,0.12)", border: "1px solid rgba(255,59,59,0.3)" }}>
-              <Lock size={10} style={{ color: "#FF3B3B" }} />
-              <span className="font-mono text-[10px] font-bold" style={{ color: "#FF3B3B" }}>LOCKED</span>
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-2.5">
+            <Award size={19} strokeWidth={2} style={{ color: RED }} />
+            <h3 className="font-sans font-bold text-white text-lg">Trade Summary</h3>
+            {isLocked && (
+              <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full" style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.3)" }}>
+                <Lock size={10} style={{ color: RED }} />
+                <span className="font-sans text-[10px] font-bold" style={{ color: RED }}>LOCKED</span>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="font-sans font-bold text-2xl leading-none" style={{ color: grade.color }}>{pct}%</p>
+              <p className="font-sans text-[11px] mt-0.5" style={{ color: "#8A8A8A" }}>Completion</p>
             </div>
-          )}
+            <span className="font-sans font-black text-4xl leading-none"
+              style={{ color: grade.color, textShadow: `0 0 18px ${grade.color}66` }}>
+              {grade.letter}
+            </span>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#1E1E1E" }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: grade.color, boxShadow: `0 0 10px 1px ${grade.color}66` }} />
         </div>
 
         {/* Discord button */}
         <button
           onClick={() => setShowSettings(true)}
-          className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl transition-all duration-200 hover:opacity-90"
+          className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 hover:opacity-90"
           style={{
             background: webhookUrl ? "rgba(88,101,242,0.18)" : "rgba(88,101,242,0.06)",
             border: `1px solid ${webhookUrl ? "#5865F266" : "rgba(88,101,242,0.2)"}`,
@@ -142,82 +200,125 @@ export function TradeSummary() {
         >
           <div className="flex items-center gap-2">
             <Send size={13} style={{ color: "#5865F2" }} />
-            <span className="font-mono text-xs font-bold" style={{ color: "#5865F2" }}>
+            <span className="font-sans text-xs font-bold" style={{ color: "#5865F2" }}>
               {webhookUrl ? "Discord Connected" : "Connect Discord"}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {sendStatus === "sending" && <span className="font-mono text-[10px] text-[#5865F2] animate-pulse">Sending…</span>}
-            {sendStatus === "ok"      && <CheckCircle size={13} style={{ color: "#00FF7F" }} />}
-            {sendStatus === "error"   && <XCircle size={13} style={{ color: "#FF3B3B" }} />}
+            {sendStatus === "sending" && <span className="font-sans text-[10px] text-[#5865F2] animate-pulse">Sending…</span>}
+            {sendStatus === "ok"      && <CheckCircle size={13} style={{ color: GREEN }} />}
+            {sendStatus === "error"   && <XCircle size={13} style={{ color: RED }} />}
             <div className="w-2 h-2 rounded-full" style={{ background: webhookUrl ? "#5865F2" : "#222",
               boxShadow: webhookUrl ? "0 0 6px 2px rgba(88,101,242,0.6)" : "none" }} />
             <Settings size={12} style={{ color: "#5865F2" }} />
           </div>
         </button>
 
-        {/* Trade info */}
-        <div className="flex-1 space-y-2">
-          {[
-            { label: "Direction", value: isBull ? "↑ BULLISH" : "↓ BEARISH", color: biasColor },
-            { label: "Session",   value: state.currentSession === "LONDON" ? "London" : "New York", color: "#fff" },
-            { label: "Pair",      value: state.currentPair, color: biasColor },
-            { label: "Rules",     value: `${checkedRules.length}/${totalRules}`, extra: `${pct}%`, extraColor: pctColor },
-            ...(state.currentPsychology.length > 0
-              ? [{ label: "Psych", value: state.currentPsychology.join(", "), color: "#A0A0A0" }]
-              : []),
-          ].map(({ label, value, color, extra, extraColor }: any) => (
-            <div key={label} className="flex justify-between items-center font-mono text-sm">
-              <span style={{ color: "#555" }}>{label}</span>
-              <span style={{ color: color ?? "#fff", fontWeight: 600 }}>
-                {value}
-                {extra && <span className="ml-1.5 text-xs" style={{ color: extraColor }}>{extra}</span>}
-              </span>
-            </div>
-          ))}
-
-          <div className="flex justify-between items-center font-mono text-sm pt-2 border-t" style={{ borderColor: "#1A1A1A" }}>
-            <span style={{ color: "#555" }}>Trades Today</span>
-            <span style={{ color: todayTakes.length >= DAILY_LIMIT ? "#FF3B3B" : todayTakes.length === DAILY_LIMIT - 1 ? "#F59E0B" : "#00FF7F", fontWeight: 700 }}>
-              {todayTakes.length} / {DAILY_LIMIT}
-            </span>
-          </div>
+        {/* Stat tiles */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+          <StatTile
+            icon={isBull ? <TrendingUp size={15} style={{ color: GREEN }} /> : <TrendingDown size={15} style={{ color: RED }} />}
+            label="Direction"
+            value={isBull ? "Bullish" : "Bearish"}
+            valueColor={biasColor}
+          />
+          <StatTile
+            icon={<MapPin size={15} style={{ color: "#F59E0B" }} />}
+            label="Session"
+            value={SESSION_LABELS[state.currentSession]}
+          />
+          <StatTile
+            icon={<CandlestickChart size={15} style={{ color: RED }} />}
+            label="Pair"
+            value={state.currentPair}
+            valueColor={RED}
+          />
+          <StatTile
+            icon={<ListChecks size={15} style={{ color: "#8A8A8A" }} />}
+            label="Total Rules"
+            value={String(totalRules)}
+          />
+          <StatTile
+            icon={<CheckCircle2 size={15} style={{ color: GREEN }} />}
+            label="Checked"
+            value={String(checkedCount)}
+            valueColor="#fff"
+            tint={GREEN}
+          />
+          <StatTile
+            icon={<XCircle size={15} style={{ color: RED }} />}
+            label="Missing"
+            value={String(missing)}
+            valueColor="#fff"
+            tint={RED}
+          />
         </div>
 
-        {/* Action buttons */}
+        {state.currentPsychology.length > 0 && (
+          <p className="font-sans text-xs" style={{ color: "#8A8A8A" }}>
+            Psychology: <span style={{ color: "#D0D0D0" }}>{state.currentPsychology.join(", ")}</span>
+          </p>
+        )}
+      </div>
+
+      {/* ── Trade Decision card ── */}
+      <div className="rounded-2xl p-6 mt-5" style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2.5">
+            <Zap size={19} strokeWidth={2} style={{ color: RED }} />
+            <h3 className="font-sans font-bold text-white text-lg">Trade Decision</h3>
+          </div>
+          <span className="font-sans text-xs" style={{ color: "#8A8A8A" }}>
+            Trades Today{" "}
+            <span className="font-bold" style={{ color: todayTakes.length >= DAILY_LIMIT ? RED : todayTakes.length === DAILY_LIMIT - 1 ? "#F59E0B" : GREEN }}>
+              {todayTakes.length} / {DAILY_LIMIT}
+            </span>
+          </span>
+        </div>
+
         {isLocked ? (
-          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(255,59,59,0.35)" }}>
-            <div className="flex flex-col items-center py-4 gap-1.5" style={{ background: "rgba(255,59,59,0.08)" }}>
-              <Lock size={24} style={{ color: "#FF3B3B" }} />
-              <p className="font-mono text-xs font-bold text-white tracking-widest uppercase">Daily Limit Reached</p>
-              <p className="font-sans text-[11px] text-[#555]">{DAILY_LIMIT} trades taken today</p>
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(239,68,68,0.35)" }}>
+            <div className="flex flex-col items-center py-4 gap-1.5" style={{ background: "rgba(239,68,68,0.08)" }}>
+              <Lock size={24} style={{ color: RED }} />
+              <p className="font-sans text-sm font-bold text-white tracking-wide uppercase">Daily Limit Reached</p>
+              <p className="font-sans text-xs text-[#8A8A8A]">{DAILY_LIMIT} trades taken today</p>
             </div>
-            <div className="flex flex-col items-center py-3 gap-1" style={{ background: "rgba(255,59,59,0.04)" }}>
-              <p className="font-mono text-[10px] uppercase tracking-widest text-[#444]">Unlocks in</p>
+            <div className="flex flex-col items-center py-3 gap-1" style={{ background: "rgba(239,68,68,0.04)" }}>
+              <p className="font-sans text-[11px] uppercase tracking-widest text-[#666]">Unlocks in</p>
               <div className="flex items-center gap-2">
-                <Clock size={13} style={{ color: "#FF3B3B" }} />
-                <span className="font-mono text-xl font-bold tracking-widest" style={{ color: "#FF3B3B" }}>{countdown}</span>
+                <Clock size={13} style={{ color: RED }} />
+                <span className="font-mono text-xl font-bold tracking-widest" style={{ color: RED }}>{countdown}</span>
               </div>
             </div>
             <div className="p-3 space-y-2">
-              <Button variant="skip" className="w-full" onClick={() => handleAction("SKIP")}>SKIP TRADE</Button>
+              <button onClick={() => handleAction("SKIP")}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-sans font-bold text-base tracking-wide uppercase border transition-all duration-200 hover:bg-[#EF444414]"
+                style={{ background: "transparent", border: `1.5px solid ${RED}`, color: RED }}>
+                <XCircle size={18} /> Skip Trade
+              </button>
               <button onClick={() => setShowUnlockConfirm(true)}
-                className="w-full py-2 rounded-xl font-mono text-xs font-bold tracking-widest hover:opacity-80 transition-opacity"
-                style={{ background: "rgba(255,59,59,0.1)", border: "1px solid rgba(255,59,59,0.25)", color: "#FF3B3B" }}>
+                className="w-full py-2 rounded-xl font-sans text-xs font-bold tracking-widest hover:opacity-80 transition-opacity"
+                style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: RED }}>
                 🔓 OVERRIDE UNLOCK
               </button>
             </div>
           </div>
         ) : (
-          <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <button
               onClick={() => handleAction("TAKE")}
-              className={`w-full py-3 rounded-xl font-mono font-black text-sm tracking-widest uppercase transition-all duration-200 ${biasAnim}`}
-              style={{ background: biasColor, color: "#000", boxShadow: biasGlow }}
+              className="flex items-center justify-center gap-2 py-4 rounded-xl font-sans font-bold text-base tracking-wide uppercase transition-all duration-200 hover:opacity-90"
+              style={{ background: biasColor, color: "#fff", boxShadow: `0 0 20px 3px ${biasColor}55` }}
             >
-              {isBull ? "↑ TAKE TRADE" : "↓ TAKE TRADE"}
+              <CheckCircle2 size={19} /> Take Trade
             </button>
-            <Button variant="skip" className="w-full" onClick={() => handleAction("SKIP")}>SKIP TRADE</Button>
+            <button
+              onClick={() => handleAction("SKIP")}
+              className="flex items-center justify-center gap-2 py-4 rounded-xl font-sans font-bold text-base tracking-wide uppercase border transition-all duration-200 hover:bg-[#EF444414]"
+              style={{ background: "transparent", border: `1.5px solid ${RED}`, color: RED }}
+            >
+              <XCircle size={19} /> Skip Trade
+            </button>
           </div>
         )}
       </div>
@@ -225,9 +326,9 @@ export function TradeSummary() {
       {/* Unlock confirmation modal */}
       <Modal open={showUnlockConfirm} onClose={() => setShowUnlockConfirm(false)} title="Override Daily Limit">
         <div className="space-y-4">
-          <div className="rounded-lg px-4 py-4 text-center" style={{ background: "rgba(255,59,59,0.08)", border: "1px solid rgba(255,59,59,0.25)" }}>
+          <div className="rounded-lg px-4 py-4 text-center" style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)" }}>
             <p className="text-3xl mb-2">⚠️</p>
-            <p className="font-mono text-sm font-bold text-white mb-1">Are you sure?</p>
+            <p className="font-sans text-sm font-bold text-white mb-1">Are you sure?</p>
             <p className="font-sans text-xs text-[#A0A0A0]">You already took {todayTakes.length} trades today. Overriding your daily limit can hurt your discipline.</p>
           </div>
           <div className="flex gap-2">
@@ -241,11 +342,11 @@ export function TradeSummary() {
       <Modal open={showSettings} onClose={() => setShowSettings(false)} title="Discord Webhook">
         <div className="space-y-4">
           <div>
-            <label className="font-mono text-xs text-[#A0A0A0] uppercase tracking-widest block mb-2">Webhook URL</label>
+            <label className="font-sans text-xs text-[#A0A0A0] uppercase tracking-widest block mb-2">Webhook URL</label>
             <input type="text" value={webhookInput} onChange={e => setWebhookInput(e.target.value)}
               placeholder="https://discord.com/api/webhooks/..."
               className="w-full bg-[#1A1A1A] border border-[#2A2A2A] text-white font-mono text-xs px-3 py-2.5 rounded-lg focus:outline-none focus:border-[#5865F2] placeholder-[#444]" />
-            <p className="font-mono text-[10px] text-[#444] mt-1.5">Discord → Edit Channel → Integrations → Webhooks → New Webhook → Copy URL</p>
+            <p className="font-sans text-[10px] text-[#666] mt-1.5">Discord → Edit Channel → Integrations → Webhooks → New Webhook → Copy URL</p>
           </div>
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={() => { setWebhookInput(""); localStorage.removeItem(WEBHOOK_KEY); setWebhookUrl(""); setShowSettings(false); }}>Clear</Button>
