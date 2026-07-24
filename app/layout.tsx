@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Martian_Mono } from "next/font/google";
 import "./globals.css";
 import { SabarProvider } from "@/store/SabarContext";
 import { AuthProvider } from "@/store/AuthContext";
@@ -9,7 +9,7 @@ import { PositionCalculator } from "@/components/journal/PositionCalculator";
 import { CloudStatus } from "@/components/layout/CloudStatus";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const geistMono = Martian_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Sabar System — Trading Journal",

@@ -2,7 +2,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/store/AuthContext";
-import { Eye, EyeOff, TrendingUp, Clock, CheckCircle } from "lucide-react";
+import { Eye, EyeOff, ArrowLeft, Clock, CheckCircle } from "lucide-react";
+import { SunriseLogo } from "@/components/SunriseLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -107,15 +108,11 @@ export default function LoginPage() {
     <>
     <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4 overflow-y-auto">
 
-      {/* Top nav links */}
-      <div className="absolute top-5 left-0 right-0 flex items-center justify-center gap-6">
+      {/* Top nav */}
+      <div className="absolute top-6 left-6">
         <button onClick={() => router.push("/home")}
-          className="font-sans text-sm text-[#555] hover:text-white transition-colors">
-          ← Home
-        </button>
-        <button onClick={() => router.push("/contact")}
-          className="font-sans text-sm text-[#555] hover:text-white transition-colors">
-          Contact
+          className="flex items-center gap-2 font-sans text-sm font-semibold text-[#999] hover:text-white transition-colors">
+          <ArrowLeft size={16} /> Back to Home
         </button>
       </div>
 
@@ -123,17 +120,17 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <div className="w-20 h-20 rounded-2xl flex items-center justify-center"
-            style={{ background: "rgba(229,62,62,0.12)", border: "1px solid rgba(229,62,62,0.4)", boxShadow: "0 0 32px 8px rgba(229,62,62,0.2)" }}>
-            <TrendingUp size={36} style={{ color: "#E53E3E" }} strokeWidth={2} />
+            style={{ background: "rgba(229,62,62,0.10)", border: "1px solid rgba(229,62,62,0.45)", boxShadow: "0 0 32px 8px rgba(229,62,62,0.2)" }}>
+            <SunriseLogo size={44} />
           </div>
         </div>
 
         <div className="text-center mb-2">
           <h1 className="text-2xl font-bold text-white">
-            <span style={{ color: "#E53E3E" }}>Sabar</span> System
+            <span style={{ color: "#E53E3E", textShadow: "0 0 16px rgba(229,62,62,0.5)" }}>A+</span> Trade Confirmation
           </h1>
           <p className="text-sm text-[#666] mt-1 font-sans">
-            {tab === "login" ? "Sign in to access your trading journal" : "Create your account to get started"}
+            {tab === "login" ? "Sign in to save trades & access your journal" : "Create your account to get started"}
           </p>
         </div>
 

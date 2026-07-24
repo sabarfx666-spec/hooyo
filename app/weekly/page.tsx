@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, TrendingUp, TrendingDown, Minus,
   Upload, X, Image as ImageIcon, MapPin,
+  ZoomIn, ZoomOut, RotateCcw, RefreshCw,
 } from "lucide-react";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
@@ -63,6 +64,8 @@ export default function WeeklyOutlookPage() {
   const [image, setImage]           = useState<string | null>(null);
   const [dragOver, setDragOver]     = useState(false);
   const [loaded, setLoaded]         = useState(false);
+  const [zoomOpen, setZoomOpen]     = useState(false);
+  const [zoomLevel, setZoomLevel]   = useState(1);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -376,10 +379,25 @@ export default function WeeklyOutlookPage() {
             {image ? (
               <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
                 <img src={image} alt="Chart" className="w-full object-contain" style={{ maxHeight: 420, background: "#0A0A0A" }} />
-                <button onClick={removeImg}
-                  className="absolute top-2 right-2 p-1.5 rounded-lg bg-black/70 text-white opacity-0 group-hover:opacity-100 transition-opacity hover:text-[#EF4444]">
-                  <X size={13} />
-                </button>
+                {/* hover controls: zoom / replace / delete */}
+                <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: "rgba(0,0,0,0.35)" }}>
+                  <button title="Zoom" onClick={() => { setZoomOpen(true); setZoomLevel(1); }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
+                    <ZoomIn size={15} color="#fff" />
+                  </button>
+                  <button title="Replace" onClick={() => fileRef.current?.click()}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
+                    <RefreshCw size={14} color="#fff" />
+                  </button>
+                  <button title="Delete" onClick={removeImg}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(239,68,68,0.9)", border: "1px solid rgba(239,68,68,0.5)" }}>
+                    <Trash2 size={14} color="#fff" />
+                  </button>
+                </div>
               </div>
             ) : (
               <div tabIndex={0}
@@ -411,6 +429,47 @@ export default function WeeklyOutlookPage() {
             className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl font-sans text-sm font-bold text-white transition-all hover:opacity-90"
             style={{ background: RED, boxShadow: `0 0 14px 2px ${RED}44` }}>
             <Plus size={15} strokeWidth={3} /> New Outlook
+          </button>
+        </div>
+      )}
+
+      {/* Zoom lightbox */}
+      {zoomOpen && image && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center"
+          style={{ background: "rgba(0,0,0,0.92)" }}
+          onClick={() => setZoomOpen(false)}>
+
+          <div className="w-full h-full overflow-auto flex items-center justify-center p-10" onClick={() => setZoomOpen(false)}>
+            <img src={image} alt="Chart zoom"
+              className="rounded-lg select-none"
+              style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center", transition: "transform 0.15s ease", maxWidth: "none" }}
+              onClick={e => e.stopPropagation()} />
+          </div>
+
+          {/* zoom toolbar */}
+          <div className="absolute top-5 left-1/2 -translate-x-1/2 flex items-center gap-1 px-2 py-1.5 rounded-xl"
+            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}
+            onClick={e => e.stopPropagation()}>
+            <button title="Zoom out" onClick={() => setZoomLevel(z => Math.max(0.25, Math.round((z - 0.25) * 100) / 100))}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10">
+              <ZoomOut size={15} color="#fff" />
+            </button>
+            <span className="font-mono text-xs font-bold text-white w-12 text-center">{Math.round(zoomLevel * 100)}%</span>
+            <button title="Zoom in" onClick={() => setZoomLevel(z => Math.min(5, Math.round((z + 0.25) * 100) / 100))}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10">
+              <ZoomIn size={15} color="#fff" />
+            </button>
+            <div className="w-px h-5 mx-1" style={{ background: "#333" }} />
+            <button title="Reset" onClick={() => setZoomLevel(1)}
+              className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10">
+              <RotateCcw size={14} color="#fff" />
+            </button>
+          </div>
+
+          <button onClick={() => setZoomOpen(false)}
+            className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:opacity-90"
+            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
+            <X size={16} color="#fff" />
           </button>
         </div>
       )}

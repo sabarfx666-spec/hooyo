@@ -8,11 +8,22 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  /* Use the sans font for everything — it has a truly plain zero (no slash/dot).
+     Monospace fonts mark their zero by design, which the user does not want. */
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-sans);
 }
 
 html, body {
   background: #000000;
   color: #ffffff;
+}
+
+/* Heavy stat/number displays render the plain-zero sans font so a "0" never shows the
+   monospace slash. (The bold mono weight otherwise falls back to a slashed system font.) */
+.font-mono.font-black,
+.font-mono.font-extrabold {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif !important;
 }
 
 /* Red-tinted grid backdrop (target design) */

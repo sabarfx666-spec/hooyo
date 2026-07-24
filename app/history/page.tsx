@@ -207,17 +207,20 @@ export default function HistoryPage() {
       {/* Stats */}
       <div className="grid grid-cols-4 gap-3">
         {[
-          { label: "Total Trades", value: totalTrades, Icon: BookOpen,     color: "#fff" },
-          { label: "Taken",        value: taken,       Icon: TrendingUp,   color: "#00FF7F" },
-          { label: "Skipped",      value: skipped,     Icon: TrendingDown, color: "#FF3B3B" },
+          { label: "Total Trades", value: totalTrades, Icon: BookOpen,     color: "#FFFFFF" },
+          { label: "Taken",        value: taken,       Icon: TrendingUp,   color: "#22C55E" },
+          { label: "Skipped",      value: skipped,     Icon: TrendingDown, color: "#EF4444" },
           { label: "A+ Trades",    value: aStar,       Icon: Award,        color: "#F5A623" },
         ].map(({ label, value, Icon, color }) => (
           <div key={label} className="p-4 rounded-xl" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
             <div className="flex items-center gap-2 mb-2">
-              <Icon size={12} style={{ color }} />
-              <p className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "#444" }}>{label}</p>
+              <Icon size={13} style={{ color }} />
+              <p className="font-sans text-xs font-medium" style={{ color: "#9A9A9A" }}>{label}</p>
             </div>
-            <p className="font-mono font-black text-2xl text-white">{value}</p>
+            <p className="font-sans font-black text-2xl"
+              style={{ color, textShadow: color !== "#FFFFFF" ? `0 0 16px ${color}55` : "none" }}>
+              {value}
+            </p>
           </div>
         ))}
       </div>
