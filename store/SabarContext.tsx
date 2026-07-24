@@ -2,9 +2,10 @@
 
 import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from "react";
 import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
-import { imgSaveTrade, imgLoadTrade, imgDeleteTrade } from "@/lib/db";
+import { imgSaveTrade, imgLoadTrade, imgDeleteTrade, imgSyncAllToCloud } from "@/lib/db";
 import { cloudEnabled } from "@/lib/supabase";
 import { cloudPull, cloudPush, applyExtras } from "@/lib/cloudSync";
+import { notionConnected, notionSyncTrades } from "@/lib/notionSync";
 import { useAuth } from "./AuthContext";
 
 const stripImages = (trade: Trade): Trade => {
@@ -182,7 +183,6 @@ function reducer(state: SabarState, action: Action): SabarState {
       const now = Date.now();
       const trade: Trade = {
         id: `trade-${now}`,
-        createdAt: now,
         date: state.selectedDate,
         session: state.currentSession,
         pair: state.currentPair,
@@ -199,6 +199,7 @@ function reducer(state: SabarState, action: Action): SabarState {
         stopLossPips: 0,
         lotSize: 0,
         rr: 0,
+        createdAt: new Date().toISOString(),
         ...action.payload,
       };
       // Save images to IndexedDB (fire-and-forget)
@@ -256,9 +257,15 @@ function reducer(state: SabarState, action: Action): SabarState {
       imgSaveTrade(updated.id, updated).catch(() => {});
       return {
         ...state,
-        trades: state.trades.map((t) =>
-          t.id === updated.id ? { ...t, ...updated } : t
-        ),
+        trades: state.trades.map((t) => {
+          if (t.id !== updated.id) return t;
+          const next = { ...t, ...updated };
+          // Stamp the close time the moment an outcome is set/changed
+          if (updated.outcome !== undefined && updated.outcome !== t.outcome) {
+            next.closedAt = new Date().toISOString();
+          }
+          return next;
+        }),
       };
     }
 
@@ -268,6 +275,8 @@ function reducer(state: SabarState, action: Action): SabarState {
         ...state,
         ...p,
         biasRules: p.biasRules ?? defaultBiasRules,
+        // Always open on today's date — never the date saved last session
+        selectedDate: new Date().toISOString().split("T")[0],
       };
     }
 
@@ -353,6 +362,8 @@ export function SabarProvider({ children }: { children: ReactNode }) {
         await cloudPush(stateRef.current);
       }
       cloudReady.current = true;
+      // Safety sweep: upload any local image the cloud doesn't have yet
+      imgSyncAllToCloud().catch(() => {});
     })();
     return () => { cancelled = true; };
   }, [hydrated, user]);
@@ -372,6 +383,17 @@ export function SabarProvider({ children }: { children: ReactNode }) {
     }, 20000);
     return () => clearInterval(iv);
   }, []);
+
+  // Auto-sync trades to Notion (when connected) a few seconds after they change
+  const tradesJson = JSON.stringify(state.trades.map(t => stripImages(t)));
+  useEffect(() => {
+    if (!notionConnected()) return;
+    const t = setTimeout(() => {
+      notionSyncTrades(stateRef.current).catch(() => {});
+    }, 5000);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tradesJson]);
 
   return (
     <SabarContext.Provider value={{ state, dispatch }}>

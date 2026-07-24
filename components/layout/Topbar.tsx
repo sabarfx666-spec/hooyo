@@ -2,10 +2,11 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
-import { CalendarDays, User, LogOut, ChevronDown, Shield, TrendingUp, BookOpen, Sun, Moon } from "lucide-react";
+import { CalendarDays, User, LogOut, ChevronDown, Shield, TrendingUp, BookOpen, Sun, Moon, Layers, Plus, Check, X } from "lucide-react";
 import { useAuth } from "@/store/AuthContext";
 import { useSabar } from "@/store/SabarContext";
 import { SunriseLogo } from "@/components/SunriseLogo";
+import { getRegistry, switchSpace, createSpace, deleteSpace, Space } from "@/lib/spaces";
 
 const navItems = [
   { href: "/weekly",  label: "Weekly Outlook", icon: TrendingUp },
@@ -40,6 +41,122 @@ function DatePickerButton() {
         className="absolute opacity-0 pointer-events-none w-0 h-0"
         style={{ top: "100%", left: 0 }}
       />
+    </div>
+  );
+}
+
+function SpaceSwitcher() {
+  const [open, setOpen] = useState(false);
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [current, setCurrent] = useState("default");
+  const [creating, setCreating] = useState(false);
+  const [newName, setNewName] = useState("");
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const reg = getRegistry();
+    setSpaces(reg.spaces);
+    setCurrent(reg.current);
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) { setOpen(false); setCreating(false); }
+    }
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const cur = spaces.find(s => s.id === current);
+
+  const submitNew = () => {
+    const name = newName.trim();
+    if (!name) return;
+    createSpace(name); // switches + reloads the page
+  };
+
+  const removeSpace = (e: React.MouseEvent, id: string, name: string) => {
+    e.stopPropagation();
+    if (!confirm(`Delete space "${name}"? Its local data is removed (cloud backup stays).`)) return;
+    deleteSpace(id);
+    const reg = getRegistry();
+    setSpaces(reg.spaces);
+  };
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-mono font-semibold transition-all hover:border-[#6AECE1]"
+        style={{ background: "#0A1416", border: "1px solid #14343A", color: "#6AECE1" }}
+        title="Switch space"
+      >
+        <Layers size={13} strokeWidth={2.5} />
+        <span className="max-w-[110px] truncate">{cur?.name ?? "Main"}</span>
+        <ChevronDown size={11} style={{ color: "#3A6A70" }} />
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-0 top-full mt-2 w-60 rounded-xl overflow-hidden z-50"
+          style={{ background: "#111", border: "1px solid #2A2A2A", boxShadow: "0 8px 32px rgba(0,0,0,0.6)" }}
+        >
+          <div className="px-4 py-2.5 border-b border-[#1A1A1A]">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-[#444]">Spaces</p>
+          </div>
+          {spaces.map(s => (
+            <button
+              key={s.id}
+              onClick={() => { if (s.id !== current) switchSpace(s.id); }}
+              className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono hover:bg-[#1A1A1A] transition-colors group"
+              style={{ color: s.id === current ? "#6AECE1" : "#999" }}
+            >
+              {s.id === current
+                ? <Check size={13} style={{ color: "#6AECE1" }} />
+                : <Layers size={13} style={{ color: "#444" }} />}
+              <span className="flex-1 text-left truncate">{s.name}</span>
+              {s.id === current && (
+                <span className="font-mono text-[8px] px-1.5 py-0.5 rounded" style={{ background: "rgba(106,236,225,0.1)", color: "#6AECE1" }}>ACTIVE</span>
+              )}
+              {s.id !== current && s.id !== "default" && (
+                <span
+                  onClick={e => removeSpace(e, s.id, s.name)}
+                  className="opacity-0 group-hover:opacity-100 text-[#444] hover:text-[#FF3B3B] transition-all"
+                  title={`Delete "${s.name}"`}
+                >
+                  <X size={12} />
+                </span>
+              )}
+            </button>
+          ))}
+          <div className="border-t border-[#1A1A1A]">
+            {creating ? (
+              <div className="flex items-center gap-2 px-3 py-2.5">
+                <input
+                  autoFocus
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") submitNew(); if (e.key === "Escape") setCreating(false); }}
+                  placeholder="Space name…"
+                  className="flex-1 min-w-0 px-2.5 py-1.5 rounded-lg font-mono text-xs text-white bg-black outline-none"
+                  style={{ border: "1px solid #2A2A2A" }}
+                />
+                <button
+                  onClick={submitNew}
+                  className="px-2.5 py-1.5 rounded-lg font-mono text-[10px] font-bold"
+                  style={{ background: "rgba(106,236,225,0.1)", color: "#6AECE1", border: "1px solid rgba(106,236,225,0.3)" }}
+                >
+                  Create
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setCreating(true)}
+                className="w-full flex items-center gap-2 px-4 py-2.5 text-xs font-mono text-[#6AECE1] hover:bg-[#1A1A1A] transition-colors"
+              >
+                <Plus size={13} /> New Space
+              </button>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -211,6 +328,7 @@ export function Topbar() {
             </Link>
           );
         })}
+        <SpaceSwitcher />
         <DatePickerButton />
         <UserMenu />
       </div>

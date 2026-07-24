@@ -1,4 +1,5 @@
 import { getSupabase } from "./supabase";
+import { currentSpaceId } from "./spaces";
 import { SabarState, Trade } from "@/store/types";
 
 /** localStorage keys synced to the cloud alongside the main journal state. */
@@ -22,9 +23,19 @@ const EXTRA_KEYS = [
   "sabar-notify-email-template",
   "sabar-notify-email-pubkey",
   "sabar-notify-email-to",
+  "sabar-notion-token",
+  "sabar-notion-db",
 ];
 
 export interface CloudData {
+  state?: Partial<SabarState>;
+  extras?: Record<string, string>;
+}
+
+/** Shape of the jsonb column: one CloudData per space. Rows written before
+ *  the space system existed hold a bare CloudData — treated as "default". */
+interface CloudRow {
+  spaces?: Record<string, CloudData>;
   state?: Partial<SabarState>;
   extras?: Record<string, string>;
 }
@@ -42,7 +53,7 @@ async function uid(): Promise<string | null> {
   return data.session?.user.id ?? null;
 }
 
-/** Download the user's journal from the cloud. Returns null when no row exists yet. */
+/** Download the current space's journal from the cloud. Null when none exists yet. */
 export async function cloudPull(): Promise<CloudData | null> {
   const sb = getSupabase();
   const userId = await uid();
@@ -53,10 +64,14 @@ export async function cloudPull(): Promise<CloudData | null> {
     .eq("user_id", userId)
     .maybeSingle();
   if (error || !data) return null;
-  return data.data as CloudData;
+  const row = data.data as CloudRow;
+  const spaceId = currentSpaceId();
+  if (row?.spaces) return row.spaces[spaceId] ?? null;
+  // Legacy row from before spaces existed = the default space
+  return spaceId === "default" ? (row as CloudData) : null;
 }
 
-/** Upload the journal (state + extra localStorage keys) to the cloud. */
+/** Upload the current space's journal (state + extras), keeping other spaces intact. */
 export async function cloudPush(state: SabarState): Promise<boolean> {
   const sb = getSupabase();
   const userId = await uid();
@@ -70,9 +85,23 @@ export async function cloudPush(state: SabarState): Promise<boolean> {
     state: { ...state, trades: state.trades.map(stripImages) },
     extras,
   };
+
+  // Read the existing row so other spaces survive the write
+  const { data: rowData } = await sb
+    .from("journal_state")
+    .select("data")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const existing = (rowData?.data ?? {}) as CloudRow;
+  const spaces: Record<string, CloudData> = existing.spaces ?? {};
+  if (!existing.spaces && existing.state) {
+    spaces["default"] = { state: existing.state, extras: existing.extras }; // migrate legacy shape
+  }
+  spaces[currentSpaceId()] = payload;
+
   const { error } = await sb
     .from("journal_state")
-    .upsert({ user_id: userId, data: payload, updated_at: new Date().toISOString() });
+    .upsert({ user_id: userId, data: { spaces }, updated_at: new Date().toISOString() });
   return !error;
 }
 

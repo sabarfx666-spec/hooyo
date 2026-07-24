@@ -34,7 +34,6 @@ export type BiasRuleSet = Record<"BULLISH" | "BEARISH", Rule[]>;
 export interface Trade {
   id: string;
   date: string;
-  createdAt?: number;   // epoch ms when the trade was logged (for time display)
   session: Session;
   pair: string;
   bias: Bias;
@@ -53,6 +52,8 @@ export interface Trade {
   rr: number;
   pnl?: number;
   notes?: string;
+  createdAt?: string;  // when the trade was logged
+  closedAt?: string;   // when the outcome (WIN/LOSS/…) was set
   chartProof?: string | null;
   chartProofs?: Partial<Record<"Weekly" | "Daily" | "4H" | "15M" | "5M" | "Result", string>>;
   imgBefore?: string | null;

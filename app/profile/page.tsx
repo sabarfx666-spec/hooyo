@@ -1,10 +1,12 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
-import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar } from "lucide-react";
+import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/store/AuthContext";
+import { buildNotionMarkdown } from "@/lib/notionExport";
+import { notionConnected, notionConnect, notionDisconnect, notionSyncTrades } from "@/lib/notionSync";
 
 function fmt(n: number) {
   const abs = Math.abs(n);
@@ -268,9 +270,115 @@ function OutcomeDonut({ wins, losses, bes }: { wins: number; losses: number; bes
   );
 }
 
+function NotionSyncCard() {
+  const { state } = useSabar();
+  const [connected, setConnected] = useState(false);
+  const [token, setToken] = useState("");
+  const [page, setPage]   = useState("");
+  const [busy, setBusy]   = useState(false);
+  const [msg, setMsg]     = useState<string | null>(null);
+
+  useEffect(() => { setConnected(notionConnected()); }, []);
+
+  const connect = async () => {
+    if (!token.trim() || !page.trim()) { setMsg("Paste both the secret key and the page link first."); return; }
+    setBusy(true); setMsg("Connecting…");
+    try {
+      await notionConnect(token.trim(), page.trim());
+      setConnected(true);
+      setMsg("Connected! Sending your trades…");
+      const r = await notionSyncTrades(state);
+      setMsg(`✓ Done — ${r.created + r.updated} trades are in Notion`);
+      setToken(""); setPage("");
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Connection failed");
+    }
+    setBusy(false);
+  };
+
+  const syncNow = async () => {
+    setBusy(true); setMsg("Syncing…");
+    try {
+      const r = await notionSyncTrades(state);
+      setMsg(`✓ Synced — ${r.created} new, ${r.updated} updated`);
+    } catch (e) {
+      setMsg(e instanceof Error ? e.message : "Sync failed");
+    }
+    setBusy(false);
+  };
+
+  const disconnect = () => { notionDisconnect(); setConnected(false); setMsg(null); };
+
+  return (
+    <div className="rounded-xl p-4 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Link2 size={13} style={{ color: connected ? "#00FF7F" : "#666" }} />
+          <span className="font-mono text-xs font-bold text-white">Notion Sync</span>
+          <span className="font-mono text-[9px] px-2 py-0.5 rounded"
+            style={connected
+              ? { background: "rgba(0,255,127,0.1)", color: "#00FF7F" }
+              : { background: "rgba(255,255,255,0.05)", color: "#666" }}>
+            {connected ? "CONNECTED — trades sync automatically" : "NOT CONNECTED"}
+          </span>
+        </div>
+        {connected && (
+          <div className="flex items-center gap-2">
+            <button onClick={syncNow} disabled={busy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] text-[#6AECE1] hover:bg-white/5 transition-all disabled:opacity-50"
+              style={{ border: "1px solid rgba(106,236,225,0.3)" }}>
+              <RefreshCw size={11} className={busy ? "animate-spin" : ""} /> Sync now
+            </button>
+            <button onClick={disconnect}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] text-[#666] hover:text-[#FF3B3B] hover:bg-white/5 transition-all">
+              <Unlink size={11} /> Disconnect
+            </button>
+          </div>
+        )}
+      </div>
+      {!connected && (
+        <div className="space-y-2">
+          <p className="font-mono text-[10px] text-[#555]">
+            1. Create a key at <span className="text-[#6AECE1]">notion.so/my-integrations</span> →
+            2. Share your Notion page with it →
+            3. Paste both below.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <input type="password" value={token} onChange={e => setToken(e.target.value)}
+              placeholder="Notion secret key (ntn_… or secret_…)"
+              className="px-3 py-2 rounded-lg font-mono text-[11px] text-white bg-black outline-none"
+              style={{ border: "1px solid #1A1A1A" }} />
+            <input type="text" value={page} onChange={e => setPage(e.target.value)}
+              placeholder="Notion page link (https://notion.so/…)"
+              className="px-3 py-2 rounded-lg font-mono text-[11px] text-white bg-black outline-none"
+              style={{ border: "1px solid #1A1A1A" }} />
+          </div>
+          <button onClick={connect} disabled={busy}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-mono text-xs font-bold transition-all disabled:opacity-50"
+            style={{ background: "rgba(229,62,62,0.12)", color: "#E53E3E", border: "1px solid rgba(229,62,62,0.3)" }}>
+            <Link2 size={12} /> Connect Notion
+          </button>
+        </div>
+      )}
+      {msg && <p className="font-mono text-[10px]" style={{ color: msg.startsWith("✓") ? "#00FF7F" : "#F5A623" }}>{msg}</p>}
+    </div>
+  );
+}
+
 export default function ProfilePage() {
   const { state } = useSabar();
   const { user } = useAuth();
+  const [copiedNotion, setCopiedNotion] = useState(false);
+
+  const copyForNotion = async () => {
+    try {
+      await navigator.clipboard.writeText(buildNotionMarkdown(state));
+      setCopiedNotion(true);
+      setTimeout(() => setCopiedNotion(false), 2500);
+    } catch {
+      alert("Could not copy — please allow clipboard access and try again.");
+    }
+  };
 
   const taken = useMemo(() => state.trades.filter(t => t.decision === "TAKE"), [state.trades]);
   const wins   = taken.filter(t => t.outcome === "WIN");
@@ -368,6 +476,14 @@ export default function ProfilePage() {
           <Link href="/accounts" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs text-[#555] hover:text-white hover:bg-white/5 transition-all">
             <Layers size={12} /> Accounts
           </Link>
+          <button onClick={copyForNotion}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-xs transition-all"
+            style={copiedNotion
+              ? { background: "rgba(0,255,127,0.12)", color: "#00FF7F", border: "1px solid rgba(0,255,127,0.3)" }
+              : { background: "rgba(229,62,62,0.12)", color: "#E53E3E", border: "1px solid rgba(229,62,62,0.3)" }}>
+            {copiedNotion ? <Check size={12} /> : <ClipboardCopy size={12} />}
+            {copiedNotion ? "Copied! Paste in Notion" : "Copy for Notion"}
+          </button>
         </div>
       </div>
 
@@ -385,6 +501,9 @@ export default function ProfilePage() {
           <p className="font-mono text-[10px] text-[#444]">Self-analysis & performance intelligence</p>
         </div>
       </div>
+
+      {/* Notion connection */}
+      <NotionSyncCard />
 
       {/* Trader Snapshot */}
       <div className="grid grid-cols-3 gap-4">
