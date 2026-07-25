@@ -71,7 +71,7 @@ export default function LoginPage() {
   // Pending approval screen
   if (pending) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-2xl p-8 text-center" style={{ background: "#111", border: "1px solid #222" }}>
           <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
             style={{ background: "rgba(245,158,11,0.12)", border: "1px solid rgba(245,158,11,0.4)", boxShadow: "0 0 32px 8px rgba(245,158,11,0.15)" }}>
@@ -106,7 +106,16 @@ export default function LoginPage() {
 
   return (
     <>
-    <div className="fixed inset-0 z-50 bg-black flex flex-col items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 overflow-y-auto"
+      style={{
+        background:
+          "radial-gradient(1100px 550px at 85% -10%, rgba(239,68,68,0.10), transparent 65%)," +
+          "radial-gradient(900px 500px at -10% 110%, rgba(239,68,68,0.07), transparent 60%)," +
+          "linear-gradient(rgba(239,68,68,0.045) 1px, transparent 1px)," +
+          "linear-gradient(90deg, rgba(239,68,68,0.045) 1px, transparent 1px)," +
+          "#070707",
+        backgroundSize: "auto, auto, 44px 44px, 44px 44px, auto",
+      }}>
 
       {/* Top nav */}
       <div className="absolute top-6 left-6">

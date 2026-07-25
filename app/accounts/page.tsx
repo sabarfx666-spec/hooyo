@@ -228,11 +228,16 @@ export default function AccountsPage() {
                 { label: "Total PnL ($)",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.round(totalPnl).toLocaleString()}`, sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: TrendingUp },
                 { label: "Total R",         value: fmtPctR(pctR(totalPnl)), sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: BarChart2 },
                 { label: "Trades Linked",   value: String(linkedTrades.length), sub: "", color: "#FF3B3B", Icon: Link2 },
-              ].map(({ label, value, sub, color }) => (
+              ].map(({ label, value, sub, color, Icon }) => (
                 <div key={label} className="px-4 py-3">
-                  <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "#444" }}>{label}</p>
-                  <p className="font-mono font-black text-xl" style={{ color }}>{value}</p>
-                  {sub && <p className="font-mono text-[10px] mt-0.5" style={{ color: "#555" }}>{sub}</p>}
+                  <p className="font-sans text-[13px] mb-1" style={{ color: "#8A8A8A" }}>{label}</p>
+                  <div className="flex items-center gap-1.5">
+                    {label !== "Account Balance" && label !== "Total R" && (
+                      <Icon size={15} style={{ color }} />
+                    )}
+                    <p className="font-sans font-bold text-lg" style={{ color }}>{value}</p>
+                  </div>
+                  {sub && <p className="font-sans text-[11px] mt-0.5" style={{ color: "#7A7A7A" }}>{sub}</p>}
                 </div>
               ))}
             </div>
