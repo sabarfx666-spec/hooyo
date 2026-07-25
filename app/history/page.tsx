@@ -30,11 +30,10 @@ function tradePct(t: Trade) {
 function gradeInfo(pct: number) {
   if (pct >= 100) return { letter: "A+", color: "#22C55E", bg: "rgba(34,197,94,0.12)" };
   if (pct >= 92)  return { letter: "A",  color: "#4ADE80", bg: "rgba(74,222,128,0.12)" };
-  if (pct >= 83)  return { letter: "A-", color: "#A3E635", bg: "rgba(163,230,53,0.12)" };
+  if (pct >= 83)  return { letter: "A-", color: "#4ADE80", bg: "rgba(74,222,128,0.12)" };
   if (pct >= 75)  return { letter: "B",  color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
   if (pct >= 67)  return { letter: "C+", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" };
-  if (pct >= 58)  return { letter: "D+", color: "#F97316", bg: "rgba(249,115,22,0.12)" };
-  return               { letter: "D-", color: "#EF4444", bg: "rgba(239,68,68,0.12)" };
+  return               { letter: "D+", color: "#F97316", bg: "rgba(249,115,22,0.12)" };
 }
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -71,6 +70,8 @@ export default function HistoryPage() {
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [pairFilter,   setPairFilter]   = useState("All Pairs");
   const [timeFilter,   setTimeFilter]   = useState("All Time");
+  const [customFrom,   setCustomFrom]   = useState("");
+  const [customTo,     setCustomTo]     = useState("");
   const [selected,     setSelected]     = useState<Trade | null>(null);
   const [editNotes,    setEditNotes]    = useState("");
   const [editPnl,      setEditPnl]      = useState("");
@@ -129,7 +130,10 @@ export default function HistoryPage() {
     return [...state.trades]
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
       .filter(t => {
-        if (timeFilter in TIME_DAYS) {
+        if (timeFilter === "Custom") {
+          if (customFrom && t.date < customFrom) return false;
+          if (customTo   && t.date > customTo)   return false;
+        } else if (timeFilter in TIME_DAYS) {
           if (new Date(t.date).getTime() < now - TIME_DAYS[timeFilter] * 86_400_000) return false;
         }
         if (gradeFilter !== "All Grades" && gradeInfo(tradePct(t)).letter !== gradeFilter) return false;
@@ -142,7 +146,7 @@ export default function HistoryPage() {
         }
         return true;
       });
-  }, [state.trades, timeFilter, gradeFilter, statusFilter, pairFilter, search]);
+  }, [state.trades, timeFilter, customFrom, customTo, gradeFilter, statusFilter, pairFilter, search]);
 
   /* stats */
   const totalTrades = filtered.length;
@@ -237,7 +241,7 @@ export default function HistoryPage() {
       {/* Dropdowns */}
       <div className="flex gap-2 flex-wrap">
         {[
-          { val: gradeFilter,  set: setGradeFilter,  opts: ["All Grades","A+","B+","C-","D-"] },
+          { val: gradeFilter,  set: setGradeFilter,  opts: ["All Grades","A+","A","A-","B","C+","D+"] },
           { val: statusFilter, set: setStatusFilter,  opts: ["All Status","Taken","Skipped"] },
           { val: pairFilter,   set: setPairFilter,    opts: ["All Pairs", ...pairs] },
         ].map(({ val, set, opts }) => (
@@ -250,8 +254,8 @@ export default function HistoryPage() {
       </div>
 
       {/* Time filters */}
-      <div className="flex gap-2 flex-wrap">
-        {["All Time","Last 7 days","Last 14 days","Last 20 days","Last 30 days"].map(tf => (
+      <div className="flex gap-2 flex-wrap items-center">
+        {["All Time","Last 7 days","Last 14 days","Last 20 days","Last 30 days","Custom"].map(tf => (
           <button key={tf} onClick={() => setTimeFilter(tf)}
             className="px-3 py-1.5 rounded-lg font-mono text-xs font-bold transition-all"
             style={timeFilter === tf
@@ -260,6 +264,27 @@ export default function HistoryPage() {
             {tf}
           </button>
         ))}
+
+        {/* Custom date range pickers */}
+        {timeFilter === "Custom" && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <input type="date" value={customFrom} max={customTo || undefined}
+              onChange={e => setCustomFrom(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg font-mono text-xs text-white focus:outline-none"
+              style={{ background: "#0D0D0D", border: "1px solid #2A2A2A", colorScheme: "dark" }} />
+            <span className="font-mono text-xs text-[#555]">→</span>
+            <input type="date" value={customTo} min={customFrom || undefined}
+              onChange={e => setCustomTo(e.target.value)}
+              className="px-2.5 py-1.5 rounded-lg font-mono text-xs text-white focus:outline-none"
+              style={{ background: "#0D0D0D", border: "1px solid #2A2A2A", colorScheme: "dark" }} />
+            {(customFrom || customTo) && (
+              <button onClick={() => { setCustomFrom(""); setCustomTo(""); }}
+                className="px-2 py-1.5 rounded-lg font-mono text-xs" style={{ color: "#555", border: "1px solid #1A1A1A" }}>
+                Clear
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Trade list + detail panel */}

@@ -13,7 +13,6 @@ const PANEL = {
   ENTRY: { title: "LTF Entry Model", subtitle: "New York Session" },
 };
 
-const ACCENT = "#22C55E";
 const DELAYS = ["0ms","60ms","120ms","180ms","240ms","300ms","360ms","420ms","480ms","540ms"];
 
 export function RulesList({ category }: RulesListProps) {
@@ -28,6 +27,8 @@ export function RulesList({ category }: RulesListProps) {
   const isBull    = bias === "BULLISH";
   const biasColor = isBull ? "#22C55E" : "#EF4444";
   const biasBg    = isBull ? "rgba(34,197,94,0.07)" : "rgba(239,68,68,0.07)";
+  // Header accent + Either/Or badges follow the direction: green Bullish, red Bearish.
+  const ACCENT    = biasColor;
 
   const biasSet   = state.biasRules?.[bias] ?? [];
   const rules     = biasSet.filter(r => r.category === category);

@@ -35,14 +35,20 @@ export function calcRR(entry: number, sl: number, tp: number): number {
   return Math.round((reward / risk) * 100) / 100;
 }
 
+// Progress-bar readiness color by completion %: orange (low) → gold (mid) → green (ready).
+export function readinessColor(pct: number) {
+  if (pct >= 75) return "#22C55E"; // green — ready
+  if (pct >= 50) return "#EAB308"; // gold — getting there
+  return "#F97316";                // orange — low
+}
+
 export function getGrade(pct: number) {
   if (pct >= 100) return { letter: "A+", color: "#22C55E" };
   if (pct >= 92)  return { letter: "A",  color: "#4ADE80" };
-  if (pct >= 83)  return { letter: "A-", color: "#A3E635" };
+  if (pct >= 83)  return { letter: "A-", color: "#4ADE80" };
   if (pct >= 75)  return { letter: "B",  color: "#6AECE1" };
   if (pct >= 67)  return { letter: "C+", color: "#F59E0B" };
-  if (pct >= 58)  return { letter: "D+", color: "#F97316" };
-  return               { letter: "D-", color: "#EF4444" };
+  return               { letter: "D+", color: "#F97316" };
 }
 
 export const PIP_VALUES: Record<string, number> = {

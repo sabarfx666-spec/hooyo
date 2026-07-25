@@ -451,12 +451,14 @@ export default function ProfilePage() {
   });
   const topPairs = Object.entries(pairMap).sort((a, b) => b[1].r - a[1].r).slice(0, 3);
 
-  // Grade distribution
+  // Grade distribution (matches the app grade scale: A+ A A- B C+ D+)
   const grades = [
-    { grade: "A+", color: "#00FF7F", bg: "rgba(0,255,127,0.08)", count: state.trades.filter(t => tradePct(t) >= 90).length },
-    { grade: "B+", color: "#6AECE1", bg: "rgba(106,236,225,0.08)", count: state.trades.filter(t => tradePct(t) >= 70 && tradePct(t) < 90).length },
-    { grade: "C-", color: "#F5A623", bg: "rgba(245,162,35,0.08)", count: state.trades.filter(t => tradePct(t) >= 50 && tradePct(t) < 70).length },
-    { grade: "D-", color: "#FF3B3B", bg: "rgba(255,59,59,0.08)", count: state.trades.filter(t => tradePct(t) < 50).length },
+    { grade: "A+", color: "#22C55E", bg: "rgba(34,197,94,0.08)",  count: state.trades.filter(t => tradePct(t) >= 100).length },
+    { grade: "A",  color: "#4ADE80", bg: "rgba(74,222,128,0.08)", count: state.trades.filter(t => tradePct(t) >= 92 && tradePct(t) < 100).length },
+    { grade: "A-", color: "#4ADE80", bg: "rgba(74,222,128,0.08)", count: state.trades.filter(t => tradePct(t) >= 83 && tradePct(t) < 92).length },
+    { grade: "B",  color: "#6AECE1", bg: "rgba(106,236,225,0.08)", count: state.trades.filter(t => tradePct(t) >= 75 && tradePct(t) < 83).length },
+    { grade: "C+", color: "#F59E0B", bg: "rgba(245,158,11,0.08)", count: state.trades.filter(t => tradePct(t) >= 67 && tradePct(t) < 75).length },
+    { grade: "D+", color: "#F97316", bg: "rgba(249,115,22,0.08)", count: state.trades.filter(t => tradePct(t) < 67).length },
   ];
 
   const topSession = Object.entries(sessionMap).sort((a, b) => b[1].total - a[1].total)[0]?.[0] ?? "—";

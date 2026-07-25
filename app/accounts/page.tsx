@@ -4,12 +4,14 @@ import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
 import {
   ArrowLeft, Plus, Trash2, CreditCard, TrendingUp, BarChart2,
-  Link2, Camera, X, ChevronRight,
+  Link2, Camera, X, ChevronRight, DollarSign, Percent,
 } from "lucide-react";
 import Link from "next/link";
 import { ChartSnapshotPanel } from "@/components/journal/ChartSnapshotPanel";
 
-type Account = { id: string; name: string; balance: number };
+type Account = { id: string; name: string; balance: number; riskPercent?: number };
+
+const BALANCE_PRESETS = [5000, 10000, 20000, 50000, 100000, 200000];
 
 function tradePct(t: Trade) {
   return t.totalRules > 0 ? Math.round((t.checkedCount / t.totalRules) * 100) : 0;
@@ -25,11 +27,10 @@ function fmtPctR(v: number) {
 function gradeInfo(pct: number) {
   if (pct >= 100) return { letter: "A+", color: "#22C55E", bg: "rgba(34,197,94,0.12)" };
   if (pct >= 92)  return { letter: "A",  color: "#4ADE80", bg: "rgba(74,222,128,0.12)" };
-  if (pct >= 83)  return { letter: "A-", color: "#A3E635", bg: "rgba(163,230,53,0.12)" };
+  if (pct >= 83)  return { letter: "A-", color: "#4ADE80", bg: "rgba(74,222,128,0.12)" };
   if (pct >= 75)  return { letter: "B",  color: "#6AECE1", bg: "rgba(106,236,225,0.12)" };
   if (pct >= 67)  return { letter: "C+", color: "#F59E0B", bg: "rgba(245,158,11,0.12)" };
-  if (pct >= 58)  return { letter: "D+", color: "#F97316", bg: "rgba(249,115,22,0.12)" };
-  return               { letter: "D-", color: "#EF4444", bg: "rgba(239,68,68,0.12)" };
+  return               { letter: "D+", color: "#F97316", bg: "rgba(249,115,22,0.12)" };
 }
 function hasCharts(t: Trade) {
   return t.chartProofs && Object.keys(t.chartProofs).length > 0;
@@ -43,6 +44,7 @@ export default function AccountsPage() {
   const [showNew,     setShowNew]     = useState(false);
   const [newName,     setNewName]     = useState("");
   const [newBal,      setNewBal]      = useState("");
+  const [newRisk,     setNewRisk]     = useState("1");
   const [chartTrade,  setChartTrade]  = useState<Trade | null>(null);
   const [page,        setPage]        = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -65,11 +67,16 @@ export default function AccountsPage() {
 
   const addAccount = () => {
     if (!newName.trim()) return;
-    const acc: Account = { id: `acc-${Date.now()}`, name: newName.trim(), balance: parseFloat(newBal) || 0 };
+    const acc: Account = {
+      id: `acc-${Date.now()}`,
+      name: newName.trim(),
+      balance: parseFloat(newBal) || 0,
+      riskPercent: parseFloat(newRisk) || 1,
+    };
     const next = [...accounts, acc];
     saveAccounts(next);
     setSelected(acc.id);
-    setNewName(""); setNewBal(""); setShowNew(false);
+    setNewName(""); setNewBal(""); setNewRisk("1"); setShowNew(false);
   };
 
   const deleteAccount = (id: string) => {
@@ -128,42 +135,101 @@ export default function AccountsPage() {
           </div>
         )}
 
-        {/* New account form */}
-        {showNew && (
-          <div className="p-4 rounded-xl space-y-3" style={{ background: "#0D0D0D", border: "1px solid #2A2A2A" }}>
-            <p className="font-mono text-xs font-bold text-white">New Account</p>
-            <div className="flex gap-2">
-              <input value={newName} onChange={e => setNewName(e.target.value)}
-                placeholder="Account name (e.g. funded next)"
-                className="flex-1 px-3 py-2 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none"
-                style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }} />
-              <input value={newBal} onChange={e => setNewBal(e.target.value)}
-                placeholder="Starting balance ($)" type="number"
-                className="w-44 px-3 py-2 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none"
-                style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }} />
+        {/* Create Trading Account modal */}
+        {showNew && (() => {
+          const bal  = parseFloat(newBal) || 0;
+          const risk = parseFloat(newRisk) || 0;
+          const oneR = (bal * risk) / 100;
+          return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+              style={{ background: "rgba(0,0,0,0.8)", backdropFilter: "blur(4px)" }}
+              onClick={() => setShowNew(false)}>
+              <div className="w-full max-w-md rounded-2xl p-6 my-8 anim-pop"
+                style={{ background: "#111", border: "1px solid #262626", boxShadow: "0 0 60px rgba(239,68,68,0.08)" }}
+                onClick={e => e.stopPropagation()}>
+
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                  <div className="flex items-center gap-2">
+                    <DollarSign size={18} style={{ color: "#EF4444" }} />
+                    <h2 className="font-sans font-bold text-white text-lg">Create Trading Account</h2>
+                  </div>
+                  <button onClick={() => setShowNew(false)} className="text-[#666] hover:text-white transition-colors"><X size={18} /></button>
+                </div>
+
+                {/* Account Name */}
+                <label className="font-sans text-sm font-semibold text-white block mb-2">Account Name</label>
+                <input autoFocus value={newName} onChange={e => setNewName(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") addAccount(); }}
+                  placeholder="e.g. funded next"
+                  className="w-full px-4 py-3 rounded-xl font-sans text-sm text-white placeholder-[#555] focus:outline-none mb-5"
+                  style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }}
+                  onFocus={e => (e.currentTarget.style.borderColor = "#EF4444")}
+                  onBlur={e => (e.currentTarget.style.borderColor = "#2A2A2A")} />
+
+                {/* Starting Balance */}
+                <label className="font-sans text-sm font-semibold text-white block mb-2">Starting Balance</label>
+                <div className="grid grid-cols-3 gap-2.5 mb-2.5">
+                  {BALANCE_PRESETS.map(p => {
+                    const active = parseFloat(newBal) === p;
+                    return (
+                      <button key={p} onClick={() => setNewBal(String(p))}
+                        className="py-2.5 rounded-xl font-sans text-sm font-bold transition-all border"
+                        style={active
+                          ? { background: "rgba(239,68,68,0.15)", borderColor: "#EF4444", color: "#EF4444" }
+                          : { background: "#0A0A0A", borderColor: "#2A2A2A", color: "#C0C0C0" }}>
+                        ${p.toLocaleString()}
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-5" style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }}>
+                  <DollarSign size={14} style={{ color: "#666" }} />
+                  <input value={BALANCE_PRESETS.includes(parseFloat(newBal)) ? "" : newBal}
+                    onChange={e => setNewBal(e.target.value)} type="number" placeholder="Custom amount"
+                    className="flex-1 min-w-0 bg-transparent font-sans text-sm text-white placeholder-[#555] focus:outline-none" />
+                </div>
+
+                {/* Risk Mode */}
+                <label className="font-sans text-sm font-semibold text-white block mb-2">Risk Mode</label>
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl mb-5" style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }}>
+                  <Percent size={14} style={{ color: "#EF4444" }} />
+                  <span className="font-sans text-sm text-white">Percent Risk (% of balance per 1R)</span>
+                </div>
+
+                {/* Risk Percent */}
+                <label className="font-sans text-sm font-semibold text-white block mb-2">Risk Percent (%)</label>
+                <div className="flex items-center gap-2 px-4 py-3 rounded-xl" style={{ background: "#0A0A0A", border: "1px solid #2A2A2A" }}>
+                  <Percent size={14} style={{ color: "#666" }} />
+                  <input value={newRisk} onChange={e => setNewRisk(e.target.value)} type="number" step="0.1" placeholder="1"
+                    className="flex-1 min-w-0 bg-transparent font-sans text-sm text-white placeholder-[#555] focus:outline-none" />
+                </div>
+                <p className="font-sans text-xs mt-1.5 mb-5" style={{ color: "#666" }}>
+                  1R = ${oneR.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+
+                {/* Create */}
+                <button onClick={addAccount} disabled={!newName.trim()}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl font-sans font-bold text-base text-white transition-all hover:opacity-90 disabled:opacity-40"
+                  style={{ background: "#EF4444", boxShadow: "0 0 20px 3px rgba(239,68,68,0.35)" }}>
+                  <Plus size={18} /> Create Account
+                </button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <button onClick={addAccount}
-                className="px-4 py-2 rounded-lg font-mono text-xs font-bold text-white"
-                style={{ background: "#E53E3E" }}>Create</button>
-              <button onClick={() => setShowNew(false)}
-                className="px-4 py-2 rounded-lg font-mono text-xs text-[#555]"
-                style={{ border: "1px solid #1A1A1A" }}>Cancel</button>
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {account ? (
           <>
-            {/* Stats */}
-            <div className="grid grid-cols-4 gap-3">
+            {/* Stats — single clean panel, no dividers */}
+            <div className="grid grid-cols-4 rounded-xl p-2" style={{ background: "rgba(20,20,20,0.5)" }}>
               {[
-                { label: "Account Balance", value: `$${curBal.toLocaleString()}`, sub: pctGain ? `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toLocaleString()} (+${pctGain}%)` : "", color: "#00FF7F", Icon: CreditCard },
-                { label: "Total PnL ($)",   value: `${totalPnl >= 0 ? "+" : ""}$${totalPnl.toLocaleString()}`, sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: TrendingUp },
+                { label: "Account Balance", value: `$${Math.round(curBal).toLocaleString()}`, sub: pctGain ? `${totalPnl >= 0 ? "+" : ""}$${Math.round(totalPnl).toLocaleString()} (+${pctGain}%)` : "", color: "#00FF7F", Icon: CreditCard },
+                { label: "Total PnL ($)",   value: `${totalPnl >= 0 ? "+" : ""}$${Math.round(totalPnl).toLocaleString()}`, sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: TrendingUp },
                 { label: "Total R",         value: fmtPctR(pctR(totalPnl)), sub: "", color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B", Icon: BarChart2 },
                 { label: "Trades Linked",   value: String(linkedTrades.length), sub: "", color: "#FF3B3B", Icon: Link2 },
-              ].map(({ label, value, sub, color, Icon }) => (
-                <div key={label} className="p-4 rounded-xl" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+              ].map(({ label, value, sub, color }) => (
+                <div key={label} className="px-4 py-3">
                   <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: "#444" }}>{label}</p>
                   <p className="font-mono font-black text-xl" style={{ color }}>{value}</p>
                   {sub && <p className="font-mono text-[10px] mt-0.5" style={{ color: "#555" }}>{sub}</p>}

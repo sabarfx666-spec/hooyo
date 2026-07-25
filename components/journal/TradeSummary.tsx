@@ -5,7 +5,7 @@ import { useSabar } from "@/store/SabarContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { sendTradeToDiscord } from "@/lib/discord";
-import { getGrade } from "@/lib/utils";
+import { getGrade, readinessColor } from "@/lib/utils";
 import { SESSION_LABELS } from "@/store/types";
 import { PSYCH_NOTE_KEY } from "@/components/journal/PsychologySelector";
 import {
@@ -80,12 +80,14 @@ export function TradeSummary() {
   const todayTakes       = state.trades.filter(t => t.decision === "TAKE" && t.date === today);
   const isLocked         = todayTakes.length >= DAILY_LIMIT && !manualUnlock;
 
-  const biasSet          = state.biasRules?.[state.currentBias] ?? [];
+  // Only main rules count toward completion — indented "either/or" sub-rules don't.
+  const biasSet          = (state.biasRules?.[state.currentBias] ?? []).filter(r => !r.indent);
   const checkedCount     = biasSet.filter(r => r.checked).length;
   const totalRules       = biasSet.length;
   const missing          = totalRules - checkedCount;
   const pct              = totalRules > 0 ? Math.round((checkedCount / totalRules) * 100) : 0;
   const grade            = getGrade(pct);
+  const barColor         = readinessColor(pct);
 
   const isBull           = state.currentBias === "BULLISH";
   const biasColor        = isBull ? GREEN : RED;
@@ -173,7 +175,7 @@ export function TradeSummary() {
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right">
-              <p className="font-sans font-bold text-2xl leading-none" style={{ color: grade.color }}>{pct}%</p>
+              <p className="font-sans font-bold text-2xl leading-none" style={{ color: barColor }}>{pct}%</p>
               <p className="font-sans text-[11px] mt-0.5" style={{ color: "#8A8A8A" }}>Completion</p>
             </div>
             <span className="font-sans font-black text-4xl leading-none"
@@ -183,10 +185,10 @@ export function TradeSummary() {
           </div>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress bar — readiness color: orange (low) → gold (mid) → green (ready) */}
         <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#1E1E1E" }}>
           <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${pct}%`, background: grade.color, boxShadow: `0 0 10px 1px ${grade.color}66` }} />
+            style={{ width: `${pct}%`, background: barColor, boxShadow: `0 0 10px 1px ${barColor}66` }} />
         </div>
 
         {/* Discord button */}
