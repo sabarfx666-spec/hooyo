@@ -5,7 +5,7 @@ import { useSabar } from "@/store/SabarContext";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 import { sendTradeToDiscord } from "@/lib/discord";
-import { getGrade, readinessColor } from "@/lib/utils";
+import { getGrade } from "@/lib/utils";
 import { SESSION_LABELS } from "@/store/types";
 import { PSYCH_NOTE_KEY } from "@/components/journal/PsychologySelector";
 import {
@@ -68,6 +68,8 @@ export function TradeSummary() {
   const [sendStatus,        setSendStatus]        = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [manualUnlock,      setManualUnlock]      = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
+  const [showDiscordConfirm, setShowDiscordConfirm] = useState(false);
+  const [pendingPsychNote,   setPendingPsychNote]   = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const saved = localStorage.getItem(WEBHOOK_KEY) ?? "";
@@ -87,7 +89,6 @@ export function TradeSummary() {
   const missing          = totalRules - checkedCount;
   const pct              = totalRules > 0 ? Math.round((checkedCount / totalRules) * 100) : 0;
   const grade            = getGrade(pct);
-  const barColor         = readinessColor(pct);
 
   const isBull           = state.currentBias === "BULLISH";
   const biasColor        = isBull ? GREEN : RED;
@@ -127,6 +128,12 @@ export function TradeSummary() {
     });
 
     if (webhookUrl && type === "TAKE") {
+      // High-grade trades (A+) get a share confirmation instead of auto-sending.
+      if (grade.letter === "A+") {
+        setPendingPsychNote(psychNote);
+        setShowDiscordConfirm(true);
+        return;
+      }
       setSendStatus("sending");
       try {
         await sendTradeToDiscord(webhookUrl, {
@@ -141,6 +148,25 @@ export function TradeSummary() {
       setTimeout(() => setSendStatus("idle"), 3000);
     }
 
+    router.push("/history");
+  };
+
+  const confirmDiscordSend = async (send: boolean) => {
+    setShowDiscordConfirm(false);
+    if (send) {
+      setSendStatus("sending");
+      try {
+        await sendTradeToDiscord(webhookUrl, {
+          pair: state.currentPair, bias: state.currentBias, session: state.currentSession,
+          decision: "TAKE", outcome: undefined,
+          pnl: undefined, rr: 0, checkedCount, totalRules,
+          notes: pendingPsychNote, accountBalance: currentBalance,
+          riskAmount: (currentBalance * state.riskPercent) / 100,
+        });
+        setSendStatus("ok");
+      } catch { setSendStatus("error"); }
+      setTimeout(() => setSendStatus("idle"), 3000);
+    }
     router.push("/history");
   };
 
@@ -173,22 +199,10 @@ export function TradeSummary() {
               </div>
             )}
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right">
-              <p className="font-sans font-bold text-2xl leading-none" style={{ color: barColor }}>{pct}%</p>
-              <p className="font-sans text-[11px] mt-0.5" style={{ color: "#8A8A8A" }}>Completion</p>
-            </div>
-            <span className="font-sans font-black text-4xl leading-none"
-              style={{ color: grade.color, textShadow: `0 0 18px ${grade.color}66` }}>
-              {grade.letter}
-            </span>
-          </div>
-        </div>
-
-        {/* Progress bar — readiness color: orange (low) → gold (mid) → green (ready) */}
-        <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: "#1E1E1E" }}>
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${pct}%`, background: barColor, boxShadow: `0 0 10px 1px ${barColor}66` }} />
+          <span className="font-sans font-black text-4xl leading-none"
+            style={{ color: grade.color, textShadow: `0 0 18px ${grade.color}66` }}>
+            {grade.letter}
+          </span>
         </div>
 
         {/* Discord button */}
@@ -336,6 +350,32 @@ export function TradeSummary() {
           <div className="flex gap-2">
             <Button variant="ghost" className="flex-1" onClick={() => setShowUnlockConfirm(false)}>Stay Locked</Button>
             <Button variant="skip" className="flex-1" onClick={() => { setManualUnlock(true); setShowUnlockConfirm(false); }}>Unlock Anyway</Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Send-to-Discord confirmation (shown for A+ trades) */}
+      <Modal open={showDiscordConfirm} onClose={() => confirmDiscordSend(false)} title="">
+        <div className="space-y-4 -mt-2">
+          <div className="flex items-center gap-2.5">
+            <Send size={18} style={{ color: RED }} />
+            <h3 className="font-sans font-bold text-white text-lg">Send to Discord?</h3>
+          </div>
+          <p className="font-sans text-sm" style={{ color: "#A0A0A0" }}>
+            You have an <span className="font-bold" style={{ color: GREEN }}>A+</span> trade! Would you like to share it with the Discord community?
+          </p>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-xl px-4 py-3.5"
+            style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #262626" }}>
+            <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Pair: </span><span className="font-bold" style={{ color: RED }}>{state.currentPair}</span></p>
+            <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Direction: </span><span className="font-bold" style={{ color: biasColor }}>{isBull ? "Bullish" : "Bearish"}</span></p>
+            <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Session: </span><span className="font-bold" style={{ color: "#D946A8" }}>{SESSION_LABELS[state.currentSession]}</span></p>
+            <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Grade: </span><span className="font-bold" style={{ color: grade.color }}>{grade.letter}</span></p>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" onClick={() => confirmDiscordSend(false)}>No, just save</Button>
+            <Button variant="primary" style={{ background: RED, color: "#fff" }} onClick={() => confirmDiscordSend(true)}>
+              <Send size={13} className="mr-1.5 inline" /> Yes, send
+            </Button>
           </div>
         </div>
       </Modal>
