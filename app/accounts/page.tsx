@@ -48,6 +48,7 @@ export default function AccountsPage() {
   const [chartTrade,  setChartTrade]  = useState<Trade | null>(null);
   const [page,        setPage]        = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [tradeLinks,  setTradeLinks]  = useState<Record<string, string>>({});
 
   useEffect(() => {
     try {
@@ -57,6 +58,7 @@ export default function AccountsPage() {
       setAccounts(saved);
       localStorage.setItem("sabar-trading-accounts", JSON.stringify(saved));
       if (saved.length > 0) setSelected(saved[0].id);
+      setTradeLinks(JSON.parse(localStorage.getItem("sabar-trade-links") ?? "{}"));
     } catch {}
   }, []);
 
@@ -87,12 +89,21 @@ export default function AccountsPage() {
 
   const account = accounts.find(a => a.id === selected);
 
+  // Trades that predate account-linking have no entry in sabar-trade-links.
+  // Attribute those to the first account so existing history isn't lost, while
+  // newly created accounts start empty until trades are linked to them.
+  const legacyAccountId = accounts[0]?.id;
+
   const linkedTrades = useMemo(() => {
     if (!account) return [];
     return [...state.trades]
       .filter(t => t.decision === "TAKE")
+      .filter(t => {
+        const linked = tradeLinks[t.id];
+        return linked ? linked === account.id : account.id === legacyAccountId;
+      })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  }, [state.trades, account]);
+  }, [state.trades, account, tradeLinks, legacyAccountId]);
 
   const totalPnl   = linkedTrades.reduce((s, t) => s + (t.pnl ?? 0), 0);
   const totalPages = Math.max(1, Math.ceil(linkedTrades.length / rowsPerPage));
