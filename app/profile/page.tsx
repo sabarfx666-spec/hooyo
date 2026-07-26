@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
-import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink } from "lucide-react";
+import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink, Sparkles, Info, CreditCard } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/store/AuthContext";
 import { buildNotionMarkdown } from "@/lib/notionExport";
@@ -365,10 +365,44 @@ function NotionSyncCard() {
   );
 }
 
+type ProfileAccount = { id: string; name: string; balance: number };
+
+const DAYS_FULL: Record<string, string> = {
+  Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday",
+};
+
+const TIME_RANGES: Record<string, number> = {
+  "Last 7 days": 7, "Last 14 days": 14, "Last 30 days": 30, "Last 90 days": 90,
+};
+
 export default function ProfilePage() {
   const { state } = useSabar();
   const { user } = useAuth();
   const [copiedNotion, setCopiedNotion] = useState(false);
+
+  // ── Filters: time range + linked trading account ──
+  const [timeRange,   setTimeRange]   = useState("All Time");
+  const [accountId,   setAccountId]   = useState("All Accounts");
+  const [accounts,    setAccounts]    = useState<ProfileAccount[]>([]);
+  const [tradeLinks,  setTradeLinks]  = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    try {
+      setAccounts(JSON.parse(localStorage.getItem("sabar-trading-accounts") ?? "[]"));
+      setTradeLinks(JSON.parse(localStorage.getItem("sabar-trade-links") ?? "{}"));
+    } catch {}
+  }, []);
+
+  // Every stat below is derived from this filtered set.
+  const trades = useMemo(() => {
+    const now = Date.now();
+    return state.trades.filter(t => {
+      if (timeRange in TIME_RANGES &&
+          new Date(t.date).getTime() < now - TIME_RANGES[timeRange] * 86_400_000) return false;
+      if (accountId !== "All Accounts" && tradeLinks[t.id] !== accountId) return false;
+      return true;
+    });
+  }, [state.trades, timeRange, accountId, tradeLinks]);
 
   const copyForNotion = async () => {
     try {
@@ -380,7 +414,7 @@ export default function ProfilePage() {
     }
   };
 
-  const taken = useMemo(() => state.trades.filter(t => t.decision === "TAKE"), [state.trades]);
+  const taken = useMemo(() => trades.filter(t => t.decision === "TAKE"), [trades]);
   const wins   = taken.filter(t => t.outcome === "WIN");
   const losses = taken.filter(t => t.outcome === "LOSS");
   const bes    = taken.filter(t => t.outcome === "BE");
@@ -409,12 +443,12 @@ export default function ProfilePage() {
 
   // Psychology tag frequency
   const psychCount: Record<string, number> = {};
-  state.trades.forEach(t => t.psychology?.forEach(p => { psychCount[p] = (psychCount[p] ?? 0) + 1; }));
+  trades.forEach(t => t.psychology?.forEach(p => { psychCount[p] = (psychCount[p] ?? 0) + 1; }));
   const topPsych = Object.entries(psychCount).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   // Discipline
-  const discipline = state.trades.length > 0
-    ? Math.round((state.trades.filter(t => tradePct(t) >= 70).length / state.trades.length) * 100)
+  const discipline = trades.length > 0
+    ? Math.round((trades.filter(t => tradePct(t) >= 70).length / trades.length) * 100)
     : 0;
 
   // Session breakdown
@@ -453,16 +487,42 @@ export default function ProfilePage() {
 
   // Grade distribution (matches the app grade scale: A+ A A- B C+ D+)
   const grades = [
-    { grade: "A+", color: "#22C55E", bg: "rgba(34,197,94,0.08)",  count: state.trades.filter(t => tradePct(t) >= 100).length },
-    { grade: "A",  color: "#4ADE80", bg: "rgba(74,222,128,0.08)", count: state.trades.filter(t => tradePct(t) >= 92 && tradePct(t) < 100).length },
-    { grade: "A-", color: "#4ADE80", bg: "rgba(74,222,128,0.08)", count: state.trades.filter(t => tradePct(t) >= 83 && tradePct(t) < 92).length },
-    { grade: "B",  color: "#6AECE1", bg: "rgba(106,236,225,0.08)", count: state.trades.filter(t => tradePct(t) >= 75 && tradePct(t) < 83).length },
-    { grade: "C+", color: "#F59E0B", bg: "rgba(245,158,11,0.08)", count: state.trades.filter(t => tradePct(t) >= 67 && tradePct(t) < 75).length },
-    { grade: "D+", color: "#F97316", bg: "rgba(249,115,22,0.08)", count: state.trades.filter(t => tradePct(t) < 67).length },
+    { grade: "A+", color: "#22C55E", bg: "rgba(34,197,94,0.08)",  count: trades.filter(t => tradePct(t) >= 100).length },
+    { grade: "A",  color: "#4ADE80", bg: "rgba(74,222,128,0.08)", count: trades.filter(t => tradePct(t) >= 92 && tradePct(t) < 100).length },
+    { grade: "A-", color: "#4ADE80", bg: "rgba(74,222,128,0.08)", count: trades.filter(t => tradePct(t) >= 83 && tradePct(t) < 92).length },
+    { grade: "B",  color: "#6AECE1", bg: "rgba(106,236,225,0.08)", count: trades.filter(t => tradePct(t) >= 75 && tradePct(t) < 83).length },
+    { grade: "C+", color: "#F59E0B", bg: "rgba(245,158,11,0.08)", count: trades.filter(t => tradePct(t) >= 67 && tradePct(t) < 75).length },
+    { grade: "D+", color: "#F97316", bg: "rgba(249,115,22,0.08)", count: trades.filter(t => tradePct(t) < 67).length },
   ];
 
   const topSession = Object.entries(sessionMap).sort((a, b) => b[1].total - a[1].total)[0]?.[0] ?? "—";
   const initials = user?.name?.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2) ?? "?";
+
+  // ── AI Review: coaching insights derived from the filtered trades ──
+  const insights: { tag: string; text: string; color: string; Icon: typeof TrendingUp }[] = [];
+  const bestSession = Object.entries(sessionMap)
+    .filter(([, d]) => d.total > 0)
+    .sort((a, b) => (b[1].r / b[1].total) - (a[1].r / a[1].total))[0];
+  if (bestSession) {
+    const [name, d] = bestSession;
+    insights.push({
+      tag: "Session", color: "#22C55E", Icon: TrendingUp,
+      text: `Your best performance comes from ${name} session with an average of ${(d.r / d.total).toFixed(1)}R per trade.`,
+    });
+  }
+  const bestDay = [...tradingDays].filter(d => d.total > 0).sort((a, b) => b.pnl - a.pnl)[0];
+  if (bestDay) {
+    insights.push({
+      tag: "Timing", color: "#60A5FA", Icon: Info,
+      text: `${DAYS_FULL[bestDay.day] ?? bestDay.day} tends to be your best trading day. Consider focusing your energy on these days.`,
+    });
+  }
+  if (discipline < 70 && trades.length > 0) {
+    insights.push({
+      tag: "Discipline", color: "#F59E0B", Icon: Target,
+      text: `Only ${discipline}% of your trades met 70%+ of your checklist. Tightening rule-following is your fastest edge.`,
+    });
+  }
 
   return (
     <div className="max-w-5xl mx-auto space-y-5 p-4 pb-10">
@@ -504,7 +564,35 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Trader Snapshot */}
+      {/* Filters — time range + linked account */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+          <Calendar size={14} style={{ color: "#666" }} />
+          <select value={timeRange} onChange={e => setTimeRange(e.target.value)}
+            className="bg-transparent font-sans text-sm text-white focus:outline-none cursor-pointer">
+            {["All Time", ...Object.keys(TIME_RANGES)].map(r => (
+              <option key={r} value={r} style={{ background: "#0D0D0D" }}>{r}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+          <CreditCard size={14} style={{ color: "#666" }} />
+          <select value={accountId} onChange={e => setAccountId(e.target.value)}
+            className="bg-transparent font-sans text-sm text-white focus:outline-none cursor-pointer">
+            <option value="All Accounts" style={{ background: "#0D0D0D" }}>All Accounts</option>
+            {accounts.map(a => (
+              <option key={a.id} value={a.id} style={{ background: "#0D0D0D" }}>{a.name}</option>
+            ))}
+          </select>
+        </div>
+        {(timeRange !== "All Time" || accountId !== "All Accounts") && (
+          <span className="font-sans text-xs" style={{ color: "#666" }}>
+            {trades.length} trade{trades.length !== 1 ? "s" : ""} in view
+          </span>
+        )}
+      </div>
+
+      {/* Trader Snapshot + AI Review */}
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 rounded-xl p-5 space-y-4" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
           <div className="flex items-center gap-3">
@@ -513,7 +601,7 @@ export default function ProfilePage() {
             </div>
             <div>
               <p className="font-mono font-bold text-white">{user?.name ?? "Trader"}</p>
-              <p className="font-mono text-[10px] text-[#444]">{state.trades.length} total trades</p>
+              <p className="font-mono text-[10px] text-[#444]">{trades.length} total trades</p>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-3">
@@ -548,30 +636,75 @@ export default function ProfilePage() {
           )}
         </div>
 
-        {/* Session Breakdown */}
-        <div className="rounded-xl p-5 space-y-3" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
-          <p className="font-mono text-xs font-bold text-white">Session Breakdown</p>
-          {sessionBreakdown.length === 0 ? (
-            <p className="font-mono text-[10px] text-[#333]">No data yet</p>
-          ) : sessionBreakdown.map(([session, data]) => (
-            <div key={session} className="p-3 rounded-lg" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
-              <div className="flex items-center justify-between mb-1.5">
-                <p className="font-mono text-xs font-bold text-white">{session}</p>
-                <span className="font-mono text-[10px]" style={{ color: data.r >= 0 ? "#00FF7F" : "#FF3B3B" }}>
-                  {data.r >= 0 ? "+" : ""}{data.r.toFixed(1)}R
-                </span>
-              </div>
-              <MiniBar value={data.wins} max={data.total} color="#00FF7F" />
-              <p className="font-mono text-[9px] mt-1" style={{ color: "#444" }}>{data.wins}W / {data.losses}L</p>
+        {/* AI Review */}
+        <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)" }}>
+              <Brain size={17} style={{ color: "#A78BFA" }} />
             </div>
-          ))}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <h3 className="font-sans font-bold text-white text-base">AI Review</h3>
+                <Sparkles size={13} style={{ color: "#A78BFA" }} />
+              </div>
+              <p className="font-sans text-[11px]" style={{ color: "#8A8A8A" }}>Coaching insights based on your trading data</p>
+            </div>
+          </div>
+
+          {insights.length === 0 ? (
+            <p className="font-sans text-xs py-6 text-center" style={{ color: "#555" }}>
+              Log a few trades and your coaching insights will appear here.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {insights.map(({ tag, text, color, Icon }) => (
+                <div key={tag} className="rounded-xl px-4 py-3"
+                  style={{ background: `${color}0D`, border: `1px solid ${color}40` }}>
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <Icon size={12} style={{ color }} />
+                    <span className="font-sans text-[10px] font-bold uppercase tracking-widest" style={{ color }}>{tag}</span>
+                  </div>
+                  <p className="font-sans text-[13px] leading-snug" style={{ color: "#D0D0D0" }}>{text}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <p className="font-sans text-[10px] text-center mt-4 leading-relaxed" style={{ color: "#555" }}>
+            <span className="font-bold">Note:</span> These insights are based on your historical trading data.
+            They are for self-improvement only and do not constitute financial advice.
+          </p>
         </div>
+      </div>
+
+      {/* Session Breakdown */}
+      <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+        <p className="font-mono text-xs font-bold text-white mb-3">Session Breakdown</p>
+        {sessionBreakdown.length === 0 ? (
+          <p className="font-mono text-[10px] text-[#333]">No data yet</p>
+        ) : (
+          <div className="grid grid-cols-3 gap-3">
+            {sessionBreakdown.map(([session, data]) => (
+              <div key={session} className="p-3 rounded-lg" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+                <div className="flex items-center justify-between mb-1.5">
+                  <p className="font-mono text-xs font-bold text-white">{session}</p>
+                  <span className="font-mono text-[10px]" style={{ color: data.r >= 0 ? "#00FF7F" : "#FF3B3B" }}>
+                    {data.r >= 0 ? "+" : ""}{data.r.toFixed(1)}R
+                  </span>
+                </div>
+                <MiniBar value={data.wins} max={data.total} color="#00FF7F" />
+                <p className="font-mono text-[9px] mt-1" style={{ color: "#444" }}>{data.wins}W / {data.losses}L</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Trade Calendar */}
       <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
         <SectionHeader icon={Calendar} title="Trade Calendar" sub="Monthly P&L heatmap by trading day" color="#6AECE1" />
-        <TradeCalendar trades={state.trades} />
+        <TradeCalendar trades={trades} />
       </div>
 
       {/* Visual Analytics */}
@@ -586,7 +719,7 @@ export default function ProfilePage() {
                 {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
               </span>
             </div>
-            <EquityCurve trades={state.trades} />
+            <EquityCurve trades={trades} />
           </div>
 
           {/* Outcome Distribution */}
@@ -650,11 +783,11 @@ export default function ProfilePage() {
             <p className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "#444" }}>Rule Adherence</p>
             <div className="flex flex-col gap-2">
               {grades.map(({ grade, color, bg, count }) => {
-                const pct = state.trades.length > 0 ? Math.round((count / state.trades.length) * 100) : 0;
+                const pct = trades.length > 0 ? Math.round((count / trades.length) * 100) : 0;
                 return (
                   <div key={grade} className="flex items-center gap-2">
                     <span className="font-mono text-[10px] font-bold w-5" style={{ color }}>{grade}</span>
-                    <MiniBar value={count} max={state.trades.length || 1} color={color} />
+                    <MiniBar value={count} max={trades.length || 1} color={color} />
                     <span className="font-mono text-[10px] w-8 text-right" style={{ color: "#444" }}>{pct}%</span>
                   </div>
                 );
