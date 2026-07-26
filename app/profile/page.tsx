@@ -1,8 +1,8 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
-import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink, Sparkles, Info, CreditCard } from "lucide-react";
+import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink, Sparkles, Info, CreditCard, ImagePlus, X } from "lucide-react";
 import Link from "next/link";
 import { useAuth } from "@/store/AuthContext";
 import { buildNotionMarkdown } from "@/lib/notionExport";
@@ -367,6 +367,8 @@ function NotionSyncCard() {
 
 type ProfileAccount = { id: string; name: string; balance: number };
 
+const AVATAR_KEY = "sabar-profile-avatar";
+
 const DAYS_FULL: Record<string, string> = {
   Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday",
 };
@@ -386,12 +388,33 @@ export default function ProfilePage() {
   const [accounts,    setAccounts]    = useState<ProfileAccount[]>([]);
   const [tradeLinks,  setTradeLinks]  = useState<Record<string, string>>({});
 
+  // Profile picture (stored locally as a data URL)
+  const [avatar, setAvatar] = useState<string | null>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     try {
       setAccounts(JSON.parse(localStorage.getItem("sabar-trading-accounts") ?? "[]"));
       setTradeLinks(JSON.parse(localStorage.getItem("sabar-trade-links") ?? "{}"));
+      setAvatar(localStorage.getItem(AVATAR_KEY));
     } catch {}
   }, []);
+
+  const pickAvatar = (file?: File | null) => {
+    if (!file || !file.type.startsWith("image/")) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const url = ev.target?.result as string;
+      setAvatar(url);
+      try { localStorage.setItem(AVATAR_KEY, url); } catch {}
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearAvatar = () => {
+    setAvatar(null);
+    try { localStorage.removeItem(AVATAR_KEY); } catch {}
+  };
 
   // Every stat below is derived from this filtered set.
   const trades = useMemo(() => {
@@ -596,12 +619,39 @@ export default function ProfilePage() {
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 rounded-xl p-5 space-y-4" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full flex items-center justify-center font-mono font-black text-lg" style={{ background: "#E53E3E", color: "#fff" }}>
-              {initials}
+            {/* Avatar — click to upload a profile picture */}
+            <div className="relative group shrink-0">
+              <button
+                onClick={() => avatarInputRef.current?.click()}
+                title="Click to change profile picture"
+                className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center font-mono font-black text-lg transition-all"
+                style={avatar
+                  ? { border: "1px solid rgba(229,62,62,0.5)" }
+                  : { background: "#E53E3E", color: "#fff" }}>
+                {avatar
+                  ? <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                  : initials}
+              </button>
+              {/* Hover overlay */}
+              <div onClick={() => avatarInputRef.current?.click()}
+                className="absolute inset-0 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                style={{ background: "rgba(0,0,0,0.6)" }}>
+                <ImagePlus size={16} style={{ color: "#fff" }} />
+              </div>
+              {avatar && (
+                <button onClick={clearAvatar} title="Remove picture"
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                  style={{ background: "#1A1A1A", border: "1px solid #2A2A2A", color: "#999" }}>
+                  <X size={10} />
+                </button>
+              )}
+              <input ref={avatarInputRef} type="file" accept="image/*" className="hidden"
+                onChange={e => { pickAvatar(e.target.files?.[0]); e.target.value = ""; }} />
             </div>
             <div>
               <p className="font-mono font-bold text-white">{user?.name ?? "Trader"}</p>
               <p className="font-mono text-[10px] text-[#444]">{trades.length} total trades</p>
+              <p className="font-mono text-[9px] mt-0.5" style={{ color: "#333" }}>Hover avatar to change</p>
             </div>
           </div>
           <div className="grid grid-cols-4 gap-3">
