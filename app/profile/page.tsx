@@ -504,9 +504,6 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* Notion connection */}
-      <NotionSyncCard />
-
       {/* Trader Snapshot */}
       <div className="grid grid-cols-3 gap-4">
         <div className="col-span-2 rounded-xl p-5 space-y-4" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
@@ -761,6 +758,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
+
+      {/* Notion connection */}
+      <NotionSyncCard />
     </div>
   );
 }
