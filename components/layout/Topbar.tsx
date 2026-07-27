@@ -207,7 +207,7 @@ export function Topbar() {
               }}
             >
               <Icon size={16} strokeWidth={2} />
-              <span className="hidden md:inline">{label}</span>
+              <span className="hidden sm:inline">{label}</span>
             </Link>
           );
         })}
