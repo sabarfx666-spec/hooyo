@@ -37,9 +37,25 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
   const [dragging, setDragging] = useState(false);
   const [zoom, setZoom]         = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const panStart = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const openZoom = (src: string) => { setZoom(src); setZoomLevel(1); };
+  const openZoom = (src: string) => { setZoom(src); setZoomLevel(1); setPan({ x: 0, y: 0 }); };
+  const resetZoom = () => { setZoomLevel(1); setPan({ x: 0, y: 0 }); };
+
+  // Drag to move the zoomed chart around
+  const startPan = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    panStart.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
+  };
+  const movePan = (e: React.PointerEvent) => {
+    const s = panStart.current;
+    if (!s) return;
+    setPan({ x: s.ox + (e.clientX - s.sx), y: s.oy + (e.clientY - s.sy) });
+  };
+  const endPan = () => { panStart.current = null; };
 
   // Load saved proofs (IndexedDB) + notes (localStorage) on open
   useEffect(() => {
@@ -228,11 +244,22 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
           style={{ background: "rgba(0,0,0,0.92)" }}
           onClick={() => setZoom(null)}>
 
-          {/* scrollable image area */}
-          <div className="w-full h-full overflow-auto flex items-center justify-center p-10" onClick={() => setZoom(null)}>
-            <img src={zoom} alt="Chart zoom"
-              className="rounded-lg select-none"
-              style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center", transition: "transform 0.15s ease", maxWidth: "none" }}
+          {/* image area — drag to move when zoomed in */}
+          <div className="w-full h-full overflow-hidden flex items-center justify-center p-10 touch-none"
+            style={{ cursor: zoomLevel > 1 ? (panStart.current ? "grabbing" : "grab") : "default" }}
+            onClick={() => setZoom(null)}
+            onPointerDown={e => { if (zoomLevel > 1) startPan(e); }}
+            onPointerMove={movePan}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}>
+            {/* 100% fits the whole chart on screen; zooming scales up from there */}
+            <img src={zoom} alt="Chart zoom" draggable={false}
+              className="rounded-lg select-none max-w-full max-h-[85vh] object-contain"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
+                transformOrigin: "center",
+                transition: panStart.current ? "none" : "transform 0.15s ease",
+              }}
               onClick={e => e.stopPropagation()} />
           </div>
 
@@ -250,7 +277,7 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
               <ZoomIn size={15} color="#fff" />
             </button>
             <div className="w-px h-5 mx-1" style={{ background: "#333" }} />
-            <button title="Reset" onClick={() => setZoomLevel(1)}
+            <button title="Reset" onClick={resetZoom}
               className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10">
               <RotateCcw size={14} color="#fff" />
             </button>

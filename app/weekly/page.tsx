@@ -66,6 +66,8 @@ export default function WeeklyOutlookPage() {
   const [loaded, setLoaded]         = useState(false);
   const [zoomOpen, setZoomOpen]     = useState(false);
   const [zoomLevel, setZoomLevel]   = useState(1);
+  const [pan, setPan]               = useState({ x: 0, y: 0 });
+  const panStart = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -132,6 +134,21 @@ export default function WeeklyOutlookPage() {
     imgDelete(outlookImgKey(entry.id)).catch(() => {});
     update({ hasImage: false });
   }
+
+  const resetZoom = () => { setZoomLevel(1); setPan({ x: 0, y: 0 }); };
+
+  // Drag to move the zoomed chart around
+  const startPan = (e: React.PointerEvent) => {
+    e.preventDefault();
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    panStart.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
+  };
+  const movePan = (e: React.PointerEvent) => {
+    const s = panStart.current;
+    if (!s) return;
+    setPan({ x: s.ox + (e.clientX - s.sx), y: s.oy + (e.clientY - s.sy) });
+  };
+  const endPan = () => { panStart.current = null; };
 
   const toggleIn = (list: string[], v: string) =>
     list.includes(v) ? list.filter(x => x !== v) : [...list, v];
@@ -382,7 +399,7 @@ export default function WeeklyOutlookPage() {
                 {/* hover controls: zoom / replace / delete */}
                 <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity"
                   style={{ background: "rgba(0,0,0,0.35)" }}>
-                  <button title="Zoom" onClick={() => { setZoomOpen(true); setZoomLevel(1); }}
+                  <button title="Zoom" onClick={() => { setZoomOpen(true); resetZoom(); }}
                     className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
                     style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
                     <ZoomIn size={15} color="#fff" />
@@ -439,10 +456,21 @@ export default function WeeklyOutlookPage() {
           style={{ background: "rgba(0,0,0,0.92)" }}
           onClick={() => setZoomOpen(false)}>
 
-          <div className="w-full h-full overflow-auto flex items-center justify-center p-10" onClick={() => setZoomOpen(false)}>
-            <img src={image} alt="Chart zoom"
-              className="rounded-lg select-none"
-              style={{ transform: `scale(${zoomLevel})`, transformOrigin: "center", transition: "transform 0.15s ease", maxWidth: "none" }}
+          <div className="w-full h-full overflow-hidden flex items-center justify-center p-10 touch-none"
+            style={{ cursor: zoomLevel > 1 ? (panStart.current ? "grabbing" : "grab") : "default" }}
+            onClick={() => setZoomOpen(false)}
+            onPointerDown={e => { if (zoomLevel > 1) startPan(e); }}
+            onPointerMove={movePan}
+            onPointerUp={endPan}
+            onPointerCancel={endPan}>
+            {/* 100% fits the whole chart on screen; zooming scales up from there */}
+            <img src={image} alt="Chart zoom" draggable={false}
+              className="rounded-lg select-none max-w-full max-h-[85vh] object-contain"
+              style={{
+                transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
+                transformOrigin: "center",
+                transition: panStart.current ? "none" : "transform 0.15s ease",
+              }}
               onClick={e => e.stopPropagation()} />
           </div>
 
@@ -460,7 +488,7 @@ export default function WeeklyOutlookPage() {
               <ZoomIn size={15} color="#fff" />
             </button>
             <div className="w-px h-5 mx-1" style={{ background: "#333" }} />
-            <button title="Reset" onClick={() => setZoomLevel(1)}
+            <button title="Reset" onClick={resetZoom}
               className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:bg-white/10">
               <RotateCcw size={14} color="#fff" />
             </button>
