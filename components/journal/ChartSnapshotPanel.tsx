@@ -184,8 +184,10 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
             {proofs[activeTf] ? (
               <div className="relative group">
                 <img src={proofs[activeTf]} alt={activeTf} className="w-full object-contain rounded-xl" style={{ maxHeight: 280 }} />
-                {/* Hover actions: zoom · replace · delete */}
-                <div className="absolute inset-0 flex items-center justify-center gap-3 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"
+                {/* Hover actions: zoom · replace · delete.
+                    pointer-events-none while hidden — an opacity-0 overlay is still
+                    clickable, so it would swallow the click that opened this panel. */}
+                <div className="absolute inset-0 flex items-center justify-center gap-3 rounded-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
                   style={{ background: "rgba(0,0,0,0.35)" }}>
                   <button title="Zoom" onClick={e => { e.stopPropagation(); openZoom(proofs[activeTf]!); }}
                     className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"

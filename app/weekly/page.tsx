@@ -405,8 +405,10 @@ export default function WeeklyOutlookPage() {
             {image ? (
               <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
                 <img src={image} alt="Chart" className="w-full object-contain" style={{ maxHeight: 420, background: "#0A0A0A" }} />
-                {/* hover controls: zoom / replace / delete */}
-                <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                {/* hover controls: zoom / replace / delete.
+                    pointer-events-none while hidden — an opacity-0 overlay still
+                    receives clicks, which would fire buttons you can't even see. */}
+                <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
                   style={{ background: "rgba(0,0,0,0.35)" }}>
                   <button title="Zoom" onClick={() => { setZoomOpen(true); resetZoom(); }}
                     className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
