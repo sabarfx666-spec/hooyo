@@ -283,7 +283,11 @@ export default function AccountsPage() {
                             <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#00FF7F" }} />
                           </td>
                           <td className="px-4 py-3 font-mono text-xs text-[#666]">
-                            {new Date(t.date).toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })}
+                            <span className="font-bold" style={{ color: "#9A9A9A" }}>
+                              {new Date(t.date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short" })}
+                            </span>
+                            {" · "}
+                            {new Date(t.date + "T12:00:00").toLocaleDateString("en-US", { month:"short", day:"numeric", year:"numeric" })}
                           </td>
                           <td className="px-4 py-3 font-mono text-sm font-bold text-white">{t.pair}</td>
                           <td className="px-4 py-3">
