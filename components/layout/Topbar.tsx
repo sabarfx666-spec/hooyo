@@ -126,7 +126,9 @@ function UserMenu() {
   );
 }
 
-const HIDDEN_PATHS = ["/login", "/home", "/contact"];
+// The topbar belongs to the checklist only — every other screen has its own
+// in-page navigation ("Back to Checklist" / "Back to Journal").
+const TOPBAR_PATHS = ["/"];
 
 function DarkModeToggle() {
   const [dark, setDark] = useState(true);
@@ -160,7 +162,7 @@ function DarkModeToggle() {
 export function Topbar() {
   const pathname = usePathname();
 
-  if (HIDDEN_PATHS.includes(pathname)) return null;
+  if (!TOPBAR_PATHS.includes(pathname)) return null;
 
   return (
     <header className="px-4 py-3"
