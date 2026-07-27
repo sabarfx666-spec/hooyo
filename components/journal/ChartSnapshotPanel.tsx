@@ -61,7 +61,10 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
   const endPan = () => { panStart.current = null; };
 
   // A drag ends with a click on the backdrop — don't treat that as "close".
-  const closeZoomUnlessDragged = () => {
+  // stopPropagation keeps the click from reaching the panel's own backdrop,
+  // which would close the whole Chart Snapshots panel along with the zoom.
+  const closeZoomUnlessDragged = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (didPan.current) { didPan.current = false; return; }
     setZoom(null);
   };
