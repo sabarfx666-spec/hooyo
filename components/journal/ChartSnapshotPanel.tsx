@@ -182,7 +182,13 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
             onDragOver={e => { e.preventDefault(); setDragging(true); }}
             onDragLeave={() => setDragging(false)}
             onDrop={e => { e.preventDefault(); setDragging(false); const f = e.dataTransfer.files[0]; if (f) loadFile(f); }}
-            onClick={() => !proofs[activeTf] && fileRef.current?.click()}
+            onPaste={e => {
+              const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith("image/"));
+              const f = item?.getAsFile();
+              if (f) loadFile(f);
+            }}
+            onClick={e => { if (!proofs[activeTf]) (e.currentTarget as HTMLElement).focus(); }}
+            tabIndex={0}
           >
             {proofs[activeTf] ? (
               <div className="relative group">

@@ -32,6 +32,8 @@ function SlotCard({ slot, image, onChange }: { slot: Slot; image: string | null;
     if (item) { const f = item.getAsFile(); if (f) readFile(f); }
   }, []);
 
+  // Clicking the card focuses it so Ctrl+V paste works, as the label promises.
+  // Opening the file picker is the "Upload file" button's job.
   return (
     <div
       tabIndex={0}
@@ -39,7 +41,7 @@ function SlotCard({ slot, image, onChange }: { slot: Slot; image: string | null;
       onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) readFile(f); }}
-      onClick={() => !image && fileRef.current?.click()}
+      onClick={(e) => { if (!image) (e.currentTarget as HTMLElement).focus(); }}
       className={cn(
         "relative rounded-xl border-2 border-dashed transition-all duration-150 outline-none",
         dragOver ? "border-[#FF3B3B] bg-[#FF3B3B]/5"
