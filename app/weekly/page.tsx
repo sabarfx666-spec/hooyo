@@ -2,7 +2,7 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, TrendingUp, TrendingDown, Minus,
-  Upload, X, Image as ImageIcon, MapPin,
+  Upload, Image as ImageIcon, MapPin,
   ZoomIn, ZoomOut, RotateCcw, RefreshCw,
 } from "lucide-react";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
@@ -504,12 +504,6 @@ export default function WeeklyOutlookPage() {
               <RotateCcw size={14} color="#fff" />
             </button>
           </div>
-
-          <button onClick={() => setZoomOpen(false)}
-            className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:opacity-90"
-            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
-            <X size={16} color="#fff" />
-          </button>
         </div>
       )}
     </div>

@@ -293,13 +293,6 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
               <RotateCcw size={14} color="#fff" />
             </button>
           </div>
-
-          {/* close */}
-          <button onClick={() => setZoom(null)}
-            className="absolute top-5 right-5 w-9 h-9 rounded-full flex items-center justify-center transition-all hover:opacity-90"
-            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
-            <X size={16} color="#fff" />
-          </button>
         </div>
       )}
     </div>
