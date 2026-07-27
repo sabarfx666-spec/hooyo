@@ -39,6 +39,7 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
   const [zoomLevel, setZoomLevel] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const panStart = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const didPan = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const openZoom = (src: string) => { setZoom(src); setZoomLevel(1); setPan({ x: 0, y: 0 }); };
@@ -49,13 +50,21 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     panStart.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
+    didPan.current = false;
   };
   const movePan = (e: React.PointerEvent) => {
     const s = panStart.current;
     if (!s) return;
+    if (Math.abs(e.clientX - s.sx) > 3 || Math.abs(e.clientY - s.sy) > 3) didPan.current = true;
     setPan({ x: s.ox + (e.clientX - s.sx), y: s.oy + (e.clientY - s.sy) });
   };
   const endPan = () => { panStart.current = null; };
+
+  // A drag ends with a click on the backdrop — don't treat that as "close".
+  const closeZoomUnlessDragged = () => {
+    if (didPan.current) { didPan.current = false; return; }
+    setZoom(null);
+  };
 
   // Load saved proofs (IndexedDB) + notes (localStorage) on open
   useEffect(() => {
@@ -242,12 +251,12 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
       {zoom && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.92)" }}
-          onClick={() => setZoom(null)}>
+          onClick={closeZoomUnlessDragged}>
 
           {/* image area — drag to move when zoomed in */}
           <div className="w-full h-full overflow-hidden flex items-center justify-center p-10 touch-none"
             style={{ cursor: zoomLevel > 1 ? (panStart.current ? "grabbing" : "grab") : "default" }}
-            onClick={() => setZoom(null)}
+            onClick={closeZoomUnlessDragged}
             onPointerDown={e => { if (zoomLevel > 1) startPan(e); }}
             onPointerMove={movePan}
             onPointerUp={endPan}

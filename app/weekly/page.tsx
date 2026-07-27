@@ -68,6 +68,7 @@ export default function WeeklyOutlookPage() {
   const [zoomLevel, setZoomLevel]   = useState(1);
   const [pan, setPan]               = useState({ x: 0, y: 0 });
   const panStart = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
+  const didPan = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -142,13 +143,21 @@ export default function WeeklyOutlookPage() {
     e.preventDefault();
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     panStart.current = { sx: e.clientX, sy: e.clientY, ox: pan.x, oy: pan.y };
+    didPan.current = false;
   };
   const movePan = (e: React.PointerEvent) => {
     const s = panStart.current;
     if (!s) return;
+    if (Math.abs(e.clientX - s.sx) > 3 || Math.abs(e.clientY - s.sy) > 3) didPan.current = true;
     setPan({ x: s.ox + (e.clientX - s.sx), y: s.oy + (e.clientY - s.sy) });
   };
   const endPan = () => { panStart.current = null; };
+
+  // A drag ends with a click on the backdrop — don't treat that as "close".
+  const closeZoomUnlessDragged = () => {
+    if (didPan.current) { didPan.current = false; return; }
+    setZoomOpen(false);
+  };
 
   const toggleIn = (list: string[], v: string) =>
     list.includes(v) ? list.filter(x => x !== v) : [...list, v];
@@ -454,11 +463,11 @@ export default function WeeklyOutlookPage() {
       {zoomOpen && image && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.92)" }}
-          onClick={() => setZoomOpen(false)}>
+          onClick={closeZoomUnlessDragged}>
 
           <div className="w-full h-full overflow-hidden flex items-center justify-center p-10 touch-none"
             style={{ cursor: zoomLevel > 1 ? (panStart.current ? "grabbing" : "grab") : "default" }}
-            onClick={() => setZoomOpen(false)}
+            onClick={closeZoomUnlessDragged}
             onPointerDown={e => { if (zoomLevel > 1) startPan(e); }}
             onPointerMove={movePan}
             onPointerUp={endPan}
