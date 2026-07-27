@@ -177,7 +177,7 @@ export default function HistoryPage() {
 
   /* ── JSX ── */
   return (
-    <div className="max-w-7xl mx-auto space-y-4 p-4">
+    <div className="max-w-5xl mx-auto space-y-4 p-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">

@@ -149,7 +149,7 @@ export default function WeeklyOutlookPage() {
   if (!loaded) return null;
 
   return (
-    <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 pb-10">
+    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 pb-10">
 
       {/* ── LEFT: entry list ── */}
       <div className="rounded-2xl p-4 h-fit" style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>

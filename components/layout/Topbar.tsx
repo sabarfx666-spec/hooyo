@@ -163,8 +163,10 @@ export function Topbar() {
   if (HIDDEN_PATHS.includes(pathname)) return null;
 
   return (
-    <header className="flex items-center justify-between gap-3 px-4 py-3"
+    <header className="px-4 py-3"
       style={{ background: "rgba(10,10,10,0.85)", backdropFilter: "blur(8px)" }}>
+      {/* Inner column matches the page content width so the logo lines up with it */}
+      <div className="max-w-5xl mx-auto w-full flex items-center justify-between gap-3">
 
       {/* Brand — links to dashboard */}
       <Link href="/" className="flex items-center gap-3 min-w-0 group">
@@ -215,6 +217,7 @@ export function Topbar() {
         <UserMenu />
       </div>
 
+      </div>
     </header>
   );
 }
