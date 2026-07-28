@@ -415,14 +415,14 @@ export default function WeeklyOutlookPage() {
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
               onChange={e => { readImg(e.target.files?.[0], pickSlot.current); e.target.value = ""; }} />
 
-            <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {images.map((img, slot) => (
                 <div key={slot}>
                   <p className="font-sans text-xs mb-1.5" style={{ color: "#666" }}>{CHART_LABELS[slot]}</p>
                   {img ? (
                     <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
-                      <img src={img} alt={CHART_LABELS[slot]} className="w-full object-contain"
-                        style={{ maxHeight: 460, background: "#0A0A0A" }} />
+                      <img src={img} alt={CHART_LABELS[slot]} className="w-full h-40 object-cover"
+                        style={{ background: "#0A0A0A" }} />
                       {/* hover controls: zoom / replace / delete.
                           pointer-events-none while hidden — an opacity-0 overlay still
                           receives clicks, which would fire buttons you can't even see. */}
@@ -455,14 +455,13 @@ export default function WeeklyOutlookPage() {
                       onDragOver={e => { e.preventDefault(); setDragOver(slot); }}
                       onDragLeave={() => setDragOver(null)}
                       onClick={() => { pickSlot.current = slot; fileRef.current?.click(); }}
-                      className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all py-10 focus:outline-none border-2 border-dashed"
+                      className="flex flex-col items-center justify-center gap-1.5 h-40 rounded-xl cursor-pointer transition-all px-2 text-center focus:outline-none border-2 border-dashed"
                       style={{
                         borderColor: dragOver === slot ? RED : "#2A2A2A",
                         background: dragOver === slot ? `${RED}08` : "rgba(255,255,255,0.02)",
                       }}>
-                      <Upload size={22} style={{ color: "#555" }} />
-                      <p className="font-sans text-sm" style={{ color: "#8A8A8A" }}>Click, paste (Ctrl+V) or drag &amp; drop</p>
-                      <p className="font-sans text-xs" style={{ color: "#555" }}>{CHART_LABELS[slot]} screenshot</p>
+                      <Upload size={20} style={{ color: "#555" }} />
+                      <p className="font-sans text-xs" style={{ color: "#8A8A8A" }}>Click, paste or drop</p>
                     </div>
                   )}
                 </div>
