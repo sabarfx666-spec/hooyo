@@ -4,7 +4,6 @@ import { Session } from "@/store/types";
 import { MapPin } from "lucide-react";
 
 const options: { value: Session; label: string }[] = [
-  { value: "ASIAN",    label: "Asian"    },
   { value: "LONDON",   label: "London"   },
   { value: "NEW_YORK", label: "New York" },
 ];
@@ -17,7 +16,7 @@ export function SessionSelector() {
   return (
     <div>
       <p className="font-sans text-sm font-medium mb-2.5" style={{ color: "#A0A0A0" }}>Session</p>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {options.map(({ value, label }) => {
           const active = state.currentSession === value;
           return (
