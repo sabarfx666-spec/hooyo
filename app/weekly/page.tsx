@@ -9,11 +9,7 @@ import { VoiceMic, appendNote } from "@/components/VoiceMic";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
 const STORE_KEY = "sabar-outlook-entries";
-// Slot 0 keeps the original key so outlooks saved before multi-image still load.
-const CHART_SLOTS = 3;
-const CHART_LABELS = ["Chart 1", "Chart 2", "Chart 3"];
-const outlookImgKey = (id: string, slot = 0) =>
-  slot === 0 ? `outlook_${id}` : `outlook_${id}_${slot}`;
+const outlookImgKey = (id: string) => `outlook_${id}`;
 
 const GREEN = "#22C55E";
 const RED   = "#EF4444";
@@ -65,17 +61,15 @@ export default function WeeklyOutlookPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterPair, setFilterPair] = useState("");
   const [filterBias, setFilterBias] = useState("");
-  const [images, setImages]         = useState<(string | null)[]>(Array(CHART_SLOTS).fill(null));
-  const [dragOver, setDragOver]     = useState<number | null>(null);
+  const [image, setImage]           = useState<string | null>(null);
+  const [dragOver, setDragOver]     = useState(false);
   const [loaded, setLoaded]         = useState(false);
   const [zoomOpen, setZoomOpen]     = useState(false);
-  const [zoomSlot, setZoomSlot]     = useState(0);
   const [zoomLevel, setZoomLevel]   = useState(1);
   const [pan, setPan]               = useState({ x: 0, y: 0 });
   const panStart = useRef<{ sx: number; sy: number; ox: number; oy: number } | null>(null);
   const didPan = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
-  const pickSlot = useRef(0);   // which chart slot the file dialog is filling
 
   useEffect(() => {
     try {
@@ -91,15 +85,12 @@ export default function WeeklyOutlookPage() {
 
   const entry = entries.find(e => e.id === selectedId) ?? null;
 
-  // Load every chart slot from IndexedDB when the selected outlook changes
+  // Load image from IndexedDB when selection changes
   useEffect(() => {
-    setImages(Array(CHART_SLOTS).fill(null));
+    setImage(null);
     if (!selectedId) return;
     let alive = true;
-    Promise.all(
-      Array.from({ length: CHART_SLOTS }, (_, i) =>
-        imgLoad(outlookImgKey(selectedId, i)).catch(() => null))
-    ).then(loaded => { if (alive) setImages(loaded); });
+    imgLoad(outlookImgKey(selectedId)).then(img => { if (alive) setImage(img); }).catch(() => {});
     return () => { alive = false; };
   }, [selectedId]);
 
@@ -120,37 +111,29 @@ export default function WeeklyOutlookPage() {
   }
 
   function removeEntry(id: string) {
-    for (let i = 0; i < CHART_SLOTS; i++) imgDelete(outlookImgKey(id, i)).catch(() => {});
+    imgDelete(outlookImgKey(id)).catch(() => {});
     const next = entries.filter(e => e.id !== id);
     persist(next);
     if (selectedId === id) setSelectedId(next[0]?.id ?? null);
   }
 
-  function readImg(file: File | null | undefined, slot: number) {
+  function readImg(file: File | null | undefined) {
     if (!entry || !file || !file.type.startsWith("image/")) return;
     const reader = new FileReader();
     reader.onload = ev => {
       const url = ev.target?.result as string;
-      setImages(prev => {
-        const next = [...prev];
-        next[slot] = url;
-        update({ hasImage: next.some(Boolean) });
-        return next;
-      });
-      imgSave(outlookImgKey(entry.id, slot), url).catch(() => {});
+      setImage(url);
+      imgSave(outlookImgKey(entry.id), url).catch(() => {});
+      update({ hasImage: true });
     };
     reader.readAsDataURL(file);
   }
 
-  function removeImg(slot: number) {
+  function removeImg() {
     if (!entry) return;
-    setImages(prev => {
-      const next = [...prev];
-      next[slot] = null;
-      update({ hasImage: next.some(Boolean) });
-      return next;
-    });
-    imgDelete(outlookImgKey(entry.id, slot)).catch(() => {});
+    setImage(null);
+    imgDelete(outlookImgKey(entry.id)).catch(() => {});
+    update({ hasImage: false });
   }
 
   const resetZoom = () => { setZoomLevel(1); setPan({ x: 0, y: 0 }); };
@@ -402,71 +385,68 @@ export default function WeeklyOutlookPage() {
               style={{ background: "#101010", border: "1px solid #262626" }} />
           </div>
 
-          {/* Charts — three slots, each full width so there's room to read them */}
+          {/* Chart image */}
           <div>
-            <div className="flex items-center gap-2 mb-2">
-              <ImageIcon size={15} style={{ color: RED }} />
-              <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Charts / Images</p>
-              <span className="font-sans text-xs" style={{ color: "#555" }}>
-                {images.filter(Boolean).length} / {CHART_SLOTS}
-              </span>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-2">
+                <ImageIcon size={15} style={{ color: RED }} />
+                <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Chart / Image</p>
+              </div>
+              <button onClick={() => fileRef.current?.click()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-sans text-xs font-semibold transition-all hover:opacity-80"
+                style={{ color: RED, border: `1px solid ${RED}44`, background: `${RED}0D` }}>
+                <Plus size={12} /> Add Image
+              </button>
             </div>
 
             <input ref={fileRef} type="file" accept="image/*" className="hidden"
-              onChange={e => { readImg(e.target.files?.[0], pickSlot.current); e.target.value = ""; }} />
+              onChange={e => { readImg(e.target.files?.[0]); e.target.value = ""; }} />
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {images.map((img, slot) => (
-                <div key={slot}>
-                  <p className="font-sans text-xs mb-1.5" style={{ color: "#666" }}>{CHART_LABELS[slot]}</p>
-                  {img ? (
-                    <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
-                      <img src={img} alt={CHART_LABELS[slot]} className="w-full h-40 object-cover"
-                        style={{ background: "#0A0A0A" }} />
-                      {/* hover controls: zoom / replace / delete.
-                          pointer-events-none while hidden — an opacity-0 overlay still
-                          receives clicks, which would fire buttons you can't even see. */}
-                      <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
-                        style={{ background: "rgba(0,0,0,0.35)" }}>
-                        <button title="Zoom" onClick={() => { setZoomSlot(slot); setZoomOpen(true); resetZoom(); }}
-                          className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                          style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
-                          <ZoomIn size={15} color="#fff" />
-                        </button>
-                        <button title="Replace" onClick={() => { pickSlot.current = slot; fileRef.current?.click(); }}
-                          className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                          style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
-                          <RefreshCw size={14} color="#fff" />
-                        </button>
-                        <button title="Delete" onClick={() => removeImg(slot)}
-                          className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                          style={{ background: "rgba(239,68,68,0.9)", border: "1px solid rgba(239,68,68,0.5)" }}>
-                          <Trash2 size={14} color="#fff" />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div tabIndex={0}
-                      onPaste={e => {
-                        const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith("image/"));
-                        if (item) { readImg(item.getAsFile(), slot); e.preventDefault(); }
-                      }}
-                      onDrop={e => { e.preventDefault(); setDragOver(null); readImg(e.dataTransfer.files?.[0], slot); }}
-                      onDragOver={e => { e.preventDefault(); setDragOver(slot); }}
-                      onDragLeave={() => setDragOver(null)}
-                      onClick={() => { pickSlot.current = slot; fileRef.current?.click(); }}
-                      className="flex flex-col items-center justify-center gap-1.5 h-40 rounded-xl cursor-pointer transition-all px-2 text-center focus:outline-none border-2 border-dashed"
-                      style={{
-                        borderColor: dragOver === slot ? RED : "#2A2A2A",
-                        background: dragOver === slot ? `${RED}08` : "rgba(255,255,255,0.02)",
-                      }}>
-                      <Upload size={20} style={{ color: "#555" }} />
-                      <p className="font-sans text-xs" style={{ color: "#8A8A8A" }}>Click, paste or drop</p>
-                    </div>
-                  )}
+            {image ? (
+              <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
+                <img src={image} alt="Chart" className="w-full object-contain" style={{ maxHeight: 420, background: "#0A0A0A" }} />
+                {/* hover controls: zoom / replace / delete.
+                    pointer-events-none while hidden — an opacity-0 overlay still
+                    receives clicks, which would fire buttons you can't even see. */}
+                <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                  style={{ background: "rgba(0,0,0,0.35)" }}>
+                  <button title="Zoom" onClick={() => { setZoomOpen(true); resetZoom(); }}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
+                    <ZoomIn size={15} color="#fff" />
+                  </button>
+                  <button title="Replace" onClick={() => fileRef.current?.click()}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
+                    <RefreshCw size={14} color="#fff" />
+                  </button>
+                  <button title="Delete" onClick={removeImg}
+                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                    style={{ background: "rgba(239,68,68,0.9)", border: "1px solid rgba(239,68,68,0.5)" }}>
+                    <Trash2 size={14} color="#fff" />
+                  </button>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <div tabIndex={0}
+                onPaste={e => {
+                  const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith("image/"));
+                  if (item) { readImg(item.getAsFile()); e.preventDefault(); }
+                }}
+                onDrop={e => { e.preventDefault(); setDragOver(false); readImg(e.dataTransfer.files?.[0]); }}
+                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                onDragLeave={() => setDragOver(false)}
+                onClick={() => fileRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all py-10 focus:outline-none border-2 border-dashed"
+                style={{
+                  borderColor: dragOver ? RED : "#2A2A2A",
+                  background: dragOver ? `${RED}08` : "rgba(255,255,255,0.02)",
+                }}>
+                <Upload size={22} style={{ color: "#555" }} />
+                <p className="font-sans text-sm" style={{ color: "#8A8A8A" }}>Click, paste (Ctrl+V) or drag &amp; drop</p>
+                <p className="font-sans text-xs" style={{ color: "#555" }}>Chart screenshot for this outlook</p>
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -482,7 +462,7 @@ export default function WeeklyOutlookPage() {
       )}
 
       {/* Zoom lightbox */}
-      {zoomOpen && images[zoomSlot] && (
+      {zoomOpen && image && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.92)" }}
           onClick={closeZoomUnlessDragged}>
@@ -495,7 +475,7 @@ export default function WeeklyOutlookPage() {
             onPointerUp={endPan}
             onPointerCancel={endPan}>
             {/* 100% fits the whole chart on screen; zooming scales up from there */}
-            <img src={images[zoomSlot]!} alt="Chart zoom" draggable={false}
+            <img src={image} alt="Chart zoom" draggable={false}
               className="rounded-lg select-none max-w-full max-h-[85vh] object-contain"
               style={{
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
