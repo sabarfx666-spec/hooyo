@@ -2,9 +2,10 @@
 import { useState, useEffect, useRef } from "react";
 import {
   Plus, Trash2, TrendingUp, TrendingDown, Minus,
-  Upload, Image as ImageIcon, MapPin,
+  Upload, Image as ImageIcon, MapPin, ArrowLeft,
   ZoomIn, ZoomOut, RotateCcw, RefreshCw,
 } from "lucide-react";
+import Link from "next/link";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
@@ -175,7 +176,15 @@ export default function WeeklyOutlookPage() {
   if (!loaded) return null;
 
   return (
-    <div className="max-w-5xl mx-auto grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5 pb-10">
+    <div className="max-w-5xl mx-auto pb-10">
+
+      {/* The topbar only shows on the checklist, so this page needs its own way back. */}
+      <Link href="/"
+        className="inline-flex items-center gap-1.5 mb-3 text-xs font-mono text-[#444] hover:text-white transition-colors">
+        <ArrowLeft size={13} /> Back to Checklist
+      </Link>
+
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
 
       {/* ── LEFT: entry list ── */}
       <div className="rounded-2xl p-4 h-fit" style={{ background: "rgba(20,20,20,0.6)", border: "1px solid #262626" }}>
@@ -460,6 +469,7 @@ export default function WeeklyOutlookPage() {
           </button>
         </div>
       )}
+      </div>
 
       {/* Zoom lightbox */}
       {zoomOpen && image && (
