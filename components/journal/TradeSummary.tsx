@@ -11,7 +11,7 @@ import { PSYCH_NOTE_KEY } from "@/components/journal/PsychologySelector";
 import {
   Send, CheckCircle, XCircle, Settings, Lock, Clock,
   Award, Zap, TrendingUp, TrendingDown, MapPin, CandlestickChart,
-  ListChecks, CheckCircle2,
+  ListChecks, CheckCircle2, Crown,
 } from "lucide-react";
 
 const WEBHOOK_KEY = "sabar-discord-webhook";
@@ -68,8 +68,8 @@ export function TradeSummary() {
   const [sendStatus,        setSendStatus]        = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [manualUnlock,      setManualUnlock]      = useState(false);
   const [showUnlockConfirm, setShowUnlockConfirm] = useState(false);
-  const [showDiscordConfirm, setShowDiscordConfirm] = useState(false);
-  const [pendingPsychNote,   setPendingPsychNote]   = useState<string | undefined>(undefined);
+  const [showSavedModal,    setShowSavedModal]    = useState(false);
+  const [showMt5Premium,    setShowMt5Premium]    = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(WEBHOOK_KEY) ?? "";
@@ -128,12 +128,6 @@ export function TradeSummary() {
     });
 
     if (webhookUrl && type === "TAKE") {
-      // High-grade trades (A+) get a share confirmation instead of auto-sending.
-      if (grade.letter === "A+") {
-        setPendingPsychNote(psychNote);
-        setShowDiscordConfirm(true);
-        return;
-      }
       setSendStatus("sending");
       try {
         await sendTradeToDiscord(webhookUrl, {
@@ -148,25 +142,17 @@ export function TradeSummary() {
       setTimeout(() => setSendStatus("idle"), 3000);
     }
 
+    // An A+ take pauses on a confirmation so the trade can be routed onward.
+    if (type === "TAKE" && grade.letter === "A+") {
+      setShowSavedModal(true);
+      return;
+    }
+
     router.push("/history");
   };
 
-  const confirmDiscordSend = async (send: boolean) => {
-    setShowDiscordConfirm(false);
-    if (send) {
-      setSendStatus("sending");
-      try {
-        await sendTradeToDiscord(webhookUrl, {
-          pair: state.currentPair, bias: state.currentBias, session: state.currentSession,
-          decision: "TAKE", outcome: undefined,
-          pnl: undefined, rr: 0, checkedCount, totalRules,
-          notes: pendingPsychNote, accountBalance: currentBalance,
-          riskAmount: (currentBalance * state.riskPercent) / 100,
-        });
-        setSendStatus("ok");
-      } catch { setSendStatus("error"); }
-      setTimeout(() => setSendStatus("idle"), 3000);
-    }
+  const closeSavedModal = () => {
+    setShowSavedModal(false);
     router.push("/history");
   };
 
@@ -354,29 +340,65 @@ export function TradeSummary() {
         </div>
       </Modal>
 
-      {/* Send-to-Discord confirmation (shown for A+ trades) */}
-      <Modal open={showDiscordConfirm} onClose={() => confirmDiscordSend(false)} title="">
-        <div className="space-y-4 -mt-2">
-          <div className="flex items-center gap-2.5">
-            <Send size={18} style={{ color: RED }} />
-            <h3 className="font-sans font-bold text-white text-lg">Send to Discord?</h3>
+      {/* "Trade Saved!" — shown after taking an A+ trade */}
+      <Modal open={showSavedModal} onClose={closeSavedModal} title="">
+        <div className="space-y-5 -mt-2">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0"
+              style={{ background: "rgba(239,68,68,0.12)", border: "1px solid rgba(239,68,68,0.35)" }}>
+              <Send size={20} style={{ color: RED }} />
+            </div>
+            <h3 className="font-sans font-bold text-white text-xl">Trade Saved!</h3>
           </div>
+
           <p className="font-sans text-sm" style={{ color: "#A0A0A0" }}>
-            You have an <span className="font-bold" style={{ color: GREEN }}>A+</span> trade! Would you like to share it with the Discord community?
+            You have an <span className="font-bold" style={{ color: GREEN }}>A+</span> trade! Choose what to do next:
           </p>
-          <div className="grid grid-cols-2 gap-x-6 gap-y-2 rounded-xl px-4 py-3.5"
+
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2.5 rounded-xl px-4 py-3.5"
             style={{ background: "rgba(255,255,255,0.03)", border: "1px solid #262626" }}>
             <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Pair: </span><span className="font-bold" style={{ color: RED }}>{state.currentPair}</span></p>
             <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Direction: </span><span className="font-bold" style={{ color: biasColor }}>{isBull ? "Bullish" : "Bearish"}</span></p>
-            <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Session: </span><span className="font-bold" style={{ color: "#D946A8" }}>{SESSION_LABELS[state.currentSession]}</span></p>
+            <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Session: </span><span className="font-bold" style={{ color: "#F59E0B" }}>{SESSION_LABELS[state.currentSession]}</span></p>
             <p className="font-sans text-sm"><span style={{ color: "#8A8A8A" }}>Grade: </span><span className="font-bold" style={{ color: grade.color }}>{grade.letter}</span></p>
           </div>
-          <div className="flex gap-2 justify-end">
-            <Button variant="ghost" onClick={() => confirmDiscordSend(false)}>No, just save</Button>
-            <Button variant="primary" style={{ background: RED, color: "#fff" }} onClick={() => confirmDiscordSend(true)}>
-              <Send size={13} className="mr-1.5 inline" /> Yes, send
-            </Button>
+
+          <div className="flex gap-3 justify-end items-center">
+            <button onClick={closeSavedModal}
+              className="px-5 py-3 rounded-xl font-sans text-sm font-semibold transition-all hover:bg-white/5"
+              style={{ background: "rgba(255,255,255,0.05)", border: "1px solid #2A2A2A", color: "#D0D0D0" }}>
+              No, just save
+            </button>
+            <button onClick={() => setShowMt5Premium(true)}
+              className="flex items-center gap-2 px-5 py-3 rounded-xl font-sans text-sm font-bold text-white transition-all hover:opacity-90"
+              style={{ background: RED, boxShadow: `0 0 22px 3px ${RED}55` }}>
+              <Lock size={15} /> Take with MT5
+              <span className="flex items-center gap-1 ml-1 px-2 py-1 rounded-lg font-sans text-[11px] font-bold"
+                style={{ background: "rgba(0,0,0,0.35)", color: "#FFD166" }}>
+                <Crown size={11} /> Premium
+              </span>
+            </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* MT5 is not wired up yet — be honest rather than pretending it worked */}
+      <Modal open={showMt5Premium} onClose={() => setShowMt5Premium(false)} title="">
+        <div className="space-y-4 -mt-2 text-center">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto"
+            style={{ background: "rgba(255,209,102,0.1)", border: "1px solid rgba(255,209,102,0.35)" }}>
+            <Crown size={24} style={{ color: "#FFD166" }} />
+          </div>
+          <h3 className="font-sans font-bold text-white text-lg">MT5 execution is Premium</h3>
+          <p className="font-sans text-sm" style={{ color: "#A0A0A0" }}>
+            Sending trades straight to MetaTrader 5 isn&apos;t connected yet. Your trade is
+            already saved to the journal — nothing was lost.
+          </p>
+          <button onClick={() => { setShowMt5Premium(false); closeSavedModal(); }}
+            className="w-full py-3 rounded-xl font-sans text-sm font-bold text-white transition-all hover:opacity-90"
+            style={{ background: RED }}>
+            Got it
+          </button>
         </div>
       </Modal>
 
