@@ -10,13 +10,24 @@ import { VoiceMic, appendNote } from "@/components/VoiceMic";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
 const STORE_KEY = "sabar-outlook-entries";
-const outlookImgKey = (id: string) => `outlook_${id}`;
+// "legacy" keeps the pre-multi-chart key so older outlooks still find their image.
+const chartImgKey = (entryId: string, chartId: string) =>
+  chartId === "legacy" ? `outlook_${entryId}` : `outlook_${entryId}_${chartId}`;
+
+const CHART_TAGS = ["No tag", "Monthly", "Weekly", "Daily", "4H", "1H", "15M", "5M"];
 
 const GREEN = "#22C55E";
 const RED   = "#EF4444";
 const AMBER = "#F59E0B";
 
 type OutlookBias = "BULLISH" | "BEARISH" | "NEUTRAL";
+
+/** One chart screenshot: the image lives in IndexedDB, this is its metadata. */
+interface ChartMeta {
+  id: string;
+  tag: string;                // timeframe label, or "No tag"
+  note: string;               // notes written about this chart
+}
 
 interface OutlookEntry {
   id: string;
@@ -29,6 +40,7 @@ interface OutlookEntry {
   biasNote: string;           // 1-line weekly bias
   analysis: string;           // full analysis / game plan
   hasImage: boolean;
+  charts?: ChartMeta[];       // undefined on outlooks saved before multi-chart
 }
 
 const SESSIONS   = ["Asian", "London", "New York"];
@@ -52,6 +64,7 @@ const newEntry = (): OutlookEntry => ({
   biasNote: "",
   analysis: "",
   hasImage: false,
+  charts: [],
 });
 
 const weekday = (date: string) =>
@@ -62,9 +75,10 @@ export default function WeeklyOutlookPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterPair, setFilterPair] = useState("");
   const [filterBias, setFilterBias] = useState("");
-  const [image, setImage]           = useState<string | null>(null);
+  const [chartImages, setChartImages] = useState<Record<string, string>>({});
   const [dragOver, setDragOver]     = useState(false);
   const [loaded, setLoaded]         = useState(false);
+  const [zoomId, setZoomId]         = useState<string | null>(null);
   const [zoomOpen, setZoomOpen]     = useState(false);
   const [zoomLevel, setZoomLevel]   = useState(1);
   const [pan, setPan]               = useState({ x: 0, y: 0 });
@@ -85,13 +99,35 @@ export default function WeeklyOutlookPage() {
   }, []);
 
   const entry = entries.find(e => e.id === selectedId) ?? null;
+  const charts: ChartMeta[] = entry?.charts ?? [];
 
-  // Load image from IndexedDB when selection changes
+  // Load this outlook's chart images from IndexedDB when the selection changes.
+  // Outlooks saved before multi-chart have one image under the old key — it gets
+  // adopted as a "legacy" chart so nothing disappears.
   useEffect(() => {
-    setImage(null);
-    if (!selectedId) return;
+    setChartImages({});
+    const e = entries.find(x => x.id === selectedId);
+    if (!selectedId || !e) return;
     let alive = true;
-    imgLoad(outlookImgKey(selectedId)).then(img => { if (alive) setImage(img); }).catch(() => {});
+
+    (async () => {
+      if (!e.charts) {
+        const old = await imgLoad(chartImgKey(selectedId, "legacy")).catch(() => null);
+        const migrated: ChartMeta[] = old ? [{ id: "legacy", tag: "No tag", note: "" }] : [];
+        if (!alive) return;
+        persist(entries.map(x => x.id === selectedId ? { ...x, charts: migrated } : x));
+        if (old) setChartImages({ legacy: old });
+        return;
+      }
+      const loaded = await Promise.all(
+        e.charts.map(c => imgLoad(chartImgKey(selectedId, c.id)).catch(() => null))
+      );
+      if (!alive) return;
+      const map: Record<string, string> = {};
+      e.charts.forEach((c, i) => { if (loaded[i]) map[c.id] = loaded[i]!; });
+      setChartImages(map);
+    })();
+
     return () => { alive = false; };
   }, [selectedId]);
 
@@ -112,29 +148,50 @@ export default function WeeklyOutlookPage() {
   }
 
   function removeEntry(id: string) {
-    imgDelete(outlookImgKey(id)).catch(() => {});
+    const victim = entries.find(e => e.id === id);
+    (victim?.charts ?? [{ id: "legacy" } as ChartMeta]).forEach(c =>
+      imgDelete(chartImgKey(id, c.id)).catch(() => {}));
     const next = entries.filter(e => e.id !== id);
     persist(next);
     if (selectedId === id) setSelectedId(next[0]?.id ?? null);
   }
 
-  function readImg(file: File | null | undefined) {
-    if (!entry || !file || !file.type.startsWith("image/")) return;
-    const reader = new FileReader();
-    reader.onload = ev => {
-      const url = ev.target?.result as string;
-      setImage(url);
-      imgSave(outlookImgKey(entry.id), url).catch(() => {});
-      update({ hasImage: true });
-    };
-    reader.readAsDataURL(file);
+  /** Add one chart per dropped/pasted/picked image file. */
+  function addCharts(files: FileList | File[] | null | undefined) {
+    if (!entry || !files) return;
+    const list = Array.from(files).filter(f => f.type.startsWith("image/"));
+    if (!list.length) return;
+
+    list.forEach((file, i) => {
+      const chartId = `c-${Date.now()}-${i}`;
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const url = ev.target?.result as string;
+        setChartImages(prev => ({ ...prev, [chartId]: url }));
+        imgSave(chartImgKey(entry.id, chartId), url).catch(() => {});
+        setEntries(prev => {
+          const next = prev.map(e => e.id === entry.id
+            ? { ...e, hasImage: true, charts: [...(e.charts ?? []), { id: chartId, tag: "No tag", note: "" }] }
+            : e);
+          try { localStorage.setItem(STORE_KEY, JSON.stringify(next)); } catch {}
+          return next;
+        });
+      };
+      reader.readAsDataURL(file);
+    });
   }
 
-  function removeImg() {
+  function updateChart(chartId: string, patch: Partial<ChartMeta>) {
     if (!entry) return;
-    setImage(null);
-    imgDelete(outlookImgKey(entry.id)).catch(() => {});
-    update({ hasImage: false });
+    update({ charts: (entry.charts ?? []).map(c => c.id === chartId ? { ...c, ...patch } : c) });
+  }
+
+  function removeChart(chartId: string) {
+    if (!entry) return;
+    imgDelete(chartImgKey(entry.id, chartId)).catch(() => {});
+    setChartImages(prev => { const n = { ...prev }; delete n[chartId]; return n; });
+    const rest = (entry.charts ?? []).filter(c => c.id !== chartId);
+    update({ charts: rest, hasImage: rest.length > 0 });
   }
 
   const resetZoom = () => { setZoomLevel(1); setPan({ x: 0, y: 0 }); };
@@ -395,67 +452,99 @@ export default function WeeklyOutlookPage() {
           </div>
 
           {/* Chart image */}
+          {/* Charts — a growing list; each has its own timeframe tag and notes */}
           <div>
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <ImageIcon size={15} style={{ color: RED }} />
-                <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Chart / Image</p>
-              </div>
-              <button onClick={() => fileRef.current?.click()}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-sans text-xs font-semibold transition-all hover:opacity-80"
-                style={{ color: RED, border: `1px solid ${RED}44`, background: `${RED}0D` }}>
-                <Plus size={12} /> Add Image
-              </button>
+            <div className="flex items-center gap-2 mb-2">
+              <ImageIcon size={15} style={{ color: RED }} />
+              <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Chart / Image</p>
+              {charts.length > 0 && (
+                <span className="font-sans text-xs" style={{ color: "#555" }}>{charts.length}</span>
+              )}
             </div>
 
-            <input ref={fileRef} type="file" accept="image/*" className="hidden"
-              onChange={e => { readImg(e.target.files?.[0]); e.target.value = ""; }} />
+            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+              onChange={e => { addCharts(e.target.files); e.target.value = ""; }} />
 
-            {image ? (
-              <div className="relative group rounded-xl overflow-hidden" style={{ border: "1px solid #262626" }}>
-                <img src={image} alt="Chart" className="w-full object-contain" style={{ maxHeight: 420, background: "#0A0A0A" }} />
-                {/* hover controls: zoom / replace / delete.
-                    pointer-events-none while hidden — an opacity-0 overlay still
-                    receives clicks, which would fire buttons you can't even see. */}
-                <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
-                  style={{ background: "rgba(0,0,0,0.35)" }}>
-                  <button title="Zoom" onClick={() => { setZoomOpen(true); resetZoom(); }}
-                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                    style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
-                    <ZoomIn size={15} color="#fff" />
-                  </button>
-                  <button title="Replace" onClick={() => fileRef.current?.click()}
-                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                    style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
-                    <RefreshCw size={14} color="#fff" />
-                  </button>
-                  <button title="Delete" onClick={removeImg}
-                    className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
-                    style={{ background: "rgba(239,68,68,0.9)", border: "1px solid rgba(239,68,68,0.5)" }}>
-                    <Trash2 size={14} color="#fff" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div tabIndex={0}
-                onPaste={e => {
-                  const item = Array.from(e.clipboardData.items).find(i => i.type.startsWith("image/"));
-                  if (item) { readImg(item.getAsFile()); e.preventDefault(); }
-                }}
-                onDrop={e => { e.preventDefault(); setDragOver(false); readImg(e.dataTransfer.files?.[0]); }}
-                onDragOver={e => { e.preventDefault(); setDragOver(true); }}
-                onDragLeave={() => setDragOver(false)}
-                onClick={() => fileRef.current?.click()}
-                className="flex flex-col items-center justify-center gap-2 rounded-xl cursor-pointer transition-all py-10 focus:outline-none border-2 border-dashed"
-                style={{
-                  borderColor: dragOver ? RED : "#2A2A2A",
-                  background: dragOver ? `${RED}08` : "rgba(255,255,255,0.02)",
-                }}>
-                <Upload size={22} style={{ color: "#555" }} />
-                <p className="font-sans text-sm" style={{ color: "#8A8A8A" }}>Click, paste (Ctrl+V) or drag &amp; drop</p>
-                <p className="font-sans text-xs" style={{ color: "#555" }}>Chart screenshot for this outlook</p>
-              </div>
-            )}
+            <div className="space-y-4">
+              {charts.map((chart, i) => {
+                const img = chartImages[chart.id];
+                return (
+                  <div key={chart.id} className="rounded-xl overflow-hidden"
+                    style={{ background: "rgba(255,255,255,0.02)", border: "1px solid #262626" }}>
+                    {img ? (
+                      <div className="relative group">
+                        <img src={img} alt={`Chart ${i + 1}`} className="w-full object-contain"
+                          style={{ maxHeight: 460, background: "#0A0A0A" }} />
+                        {/* hover controls — pointer-events-none while hidden so an
+                            invisible overlay can't swallow clicks */}
+                        <div className="absolute inset-0 flex items-center justify-center gap-2.5 opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity"
+                          style={{ background: "rgba(0,0,0,0.35)" }}>
+                          <button title="Zoom" onClick={() => { setZoomId(chart.id); setZoomOpen(true); resetZoom(); }}
+                            className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid #333" }}>
+                            <ZoomIn size={15} color="#fff" />
+                          </button>
+                          <button title="Delete" onClick={() => removeChart(chart.id)}
+                            className="w-9 h-9 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                            style={{ background: "rgba(239,68,68,0.9)", border: "1px solid rgba(239,68,68,0.5)" }}>
+                            <Trash2 size={14} color="#fff" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center py-10 font-sans text-xs" style={{ color: "#555" }}>
+                        Image missing
+                      </div>
+                    )}
+
+                    {/* tag + label */}
+                    <div className="flex items-center gap-2.5 px-3 pt-3">
+                      <select value={chart.tag}
+                        onChange={e => updateChart(chart.id, { tag: e.target.value })}
+                        className="px-3 py-1.5 rounded-lg font-sans text-xs text-white focus:outline-none cursor-pointer"
+                        style={{ background: "#141414", border: "1px solid #2A2A2A" }}>
+                        {CHART_TAGS.map(t => (
+                          <option key={t} value={t} style={{ background: "#141414" }}>{t}</option>
+                        ))}
+                      </select>
+                      <span className="font-sans text-xs" style={{ color: "#777" }}>Chart {i + 1}</span>
+                    </div>
+
+                    {/* per-chart notes */}
+                    <textarea value={chart.note}
+                      onChange={e => updateChart(chart.id, { note: e.target.value })}
+                      placeholder="Write notes about this chart..."
+                      rows={3}
+                      className="w-full mt-2.5 mb-3 mx-3 font-sans text-sm text-white px-3 py-2.5 rounded-lg focus:outline-none placeholder-[#555] resize-none leading-relaxed"
+                      style={{ background: "#101010", border: "1px solid #262626", width: "calc(100% - 1.5rem)" }} />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* add more — click, paste or drop */}
+            <div tabIndex={0}
+              onPaste={e => {
+                const files = Array.from(e.clipboardData.items)
+                  .filter(i => i.type.startsWith("image/"))
+                  .map(i => i.getAsFile())
+                  .filter(Boolean) as File[];
+                if (files.length) { addCharts(files); e.preventDefault(); }
+              }}
+              onDrop={e => { e.preventDefault(); setDragOver(false); addCharts(e.dataTransfer.files); }}
+              onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onClick={() => fileRef.current?.click()}
+              className={`flex items-center justify-center gap-2 rounded-xl cursor-pointer transition-all py-4 focus:outline-none border-2 border-dashed ${charts.length ? "mt-4" : ""}`}
+              style={{
+                borderColor: dragOver ? RED : "#2A2A2A",
+                background: dragOver ? `${RED}08` : "rgba(255,255,255,0.02)",
+              }}>
+              <Plus size={16} style={{ color: "#777" }} />
+              <p className="font-sans text-sm" style={{ color: "#8A8A8A" }}>
+                Add more charts <span style={{ color: "#555" }}>· Paste (Ctrl+V) · Drag &amp; Drop</span>
+              </p>
+            </div>
           </div>
         </div>
       ) : (
@@ -472,7 +561,7 @@ export default function WeeklyOutlookPage() {
       </div>
 
       {/* Zoom lightbox */}
-      {zoomOpen && image && (
+      {zoomOpen && zoomId && chartImages[zoomId] && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center"
           style={{ background: "rgba(0,0,0,0.92)" }}
           onClick={closeZoomUnlessDragged}>
@@ -485,7 +574,7 @@ export default function WeeklyOutlookPage() {
             onPointerUp={endPan}
             onPointerCancel={endPan}>
             {/* 100% fits the whole chart on screen; zooming scales up from there */}
-            <img src={image} alt="Chart zoom" draggable={false}
+            <img src={chartImages[zoomId]} alt="Chart zoom" draggable={false}
               className="rounded-lg select-none max-w-full max-h-[85vh] object-contain"
               style={{
                 transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoomLevel})`,
