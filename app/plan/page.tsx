@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
+import { VoiceMic, appendNote } from "@/components/VoiceMic";
 import {
   ArrowLeft, Plus, Trash2, StickyNote, Undo2, Redo2,
   Maximize, Download, ZoomIn, ZoomOut, ChevronDown, ChevronRight,
@@ -246,6 +247,19 @@ export default function PlanPage() {
         <button className={btn} style={btnStyle} onClick={undo} title="Undo"><Undo2 size={15} /></button>
         <button className={btn} style={btnStyle} onClick={redo} title="Redo"><Redo2 size={15} /></button>
         <button className={btn} style={btnStyle} onClick={fit} title="Reset zoom"><Maximize size={15} /></button>
+        <div className="w-px h-6 mx-1" style={{ background: "#262626" }} />
+        {/* dictates into whichever node is selected */}
+        {selected ? (
+          <VoiceMic label="Voice note"
+            onText={t => {
+              const n = nodes.find(x => x.id === selected);
+              if (n) updateNode(selected, { text: appendNote(n.text, t) });
+            }} />
+        ) : (
+          <span className="font-sans text-xs px-2" style={{ color: "#555" }}>
+            Select a node to dictate
+          </span>
+        )}
         <div className="w-px h-6 mx-1" style={{ background: "#262626" }} />
         <button className={btn} style={btnStyle} onClick={exportJson}>
           <Download size={15} /> Export

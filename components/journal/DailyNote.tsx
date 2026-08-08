@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { FileText, X, Plus, Trash2 } from "lucide-react";
+import { VoiceMic, appendNote } from "@/components/VoiceMic";
 
 const STORE_KEY = "sabar-daily-notes";
 const RED = "#E53E3E";
@@ -119,10 +120,14 @@ export function DailyNote() {
               style={{ background: "rgba(255,255,255,0.02)", border: "1px solid #262626" }}>
               <div className="flex items-center justify-between mb-1.5">
                 <span className="font-sans text-[11px]" style={{ color: "#666" }}>Note {i + 1}</span>
-                <button onClick={() => removeNote(note.id)} title="Delete note"
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-[#666] hover:text-[#EF4444]">
-                  <Trash2 size={13} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <VoiceMic label="Voice note"
+                    onText={t => updateNote(note.id, appendNote(note.text, t))} />
+                  <button onClick={() => removeNote(note.id)} title="Delete note"
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-[#666] hover:text-[#EF4444]">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               </div>
               <textarea
                 autoFocus={!note.text}

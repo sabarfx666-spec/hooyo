@@ -508,6 +508,10 @@ export default function WeeklyOutlookPage() {
                         ))}
                       </select>
                       <span className="font-sans text-xs" style={{ color: "#777" }}>Chart {i + 1}</span>
+                      <span className="ml-auto">
+                        <VoiceMic label="Voice note"
+                          onText={t => updateChart(chart.id, { note: appendNote(chart.note, t) })} />
+                      </span>
                     </div>
 
                     {/* per-chart notes */}

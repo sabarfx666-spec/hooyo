@@ -5,8 +5,11 @@ import { Mic } from "lucide-react";
 /**
  * Speech-to-text button for note fields. Speaks Somali (default) or English.
  * Calls onText with each recognized phrase — parent appends it to its note state.
+ *
+ * `label` renders it as a wider "Voice note" button instead of the bare mic,
+ * for note fields that have room for it.
  */
-export function VoiceMic({ onText }: { onText: (text: string) => void }) {
+export function VoiceMic({ onText, label }: { onText: (text: string) => void; label?: string }) {
   const [on, setOn]     = useState(false);
   const [lang, setLang] = useState<"so-SO" | "en-US">("so-SO");
   const [err, setErr]   = useState<string | null>(null);
@@ -56,11 +59,14 @@ export function VoiceMic({ onText }: { onText: (text: string) => void }) {
         {lang === "so-SO" ? "SO" : "EN"}
       </button>
       <button type="button" onClick={toggle} title={on ? "Stop recording" : "Speak your note"}
-        className="p-1.5 rounded-md transition-all"
+        className={label
+          ? "flex items-center gap-2 px-3 py-1.5 rounded-lg font-sans text-xs font-semibold transition-all"
+          : "p-1.5 rounded-md transition-all"}
         style={on
           ? { background: "rgba(255,59,59,0.15)", border: "1px solid #FF3B3B", color: "#FF3B3B" }
           : { background: "transparent", border: "1px solid #2A2A2A", color: "#666" }}>
-        <Mic size={12} />
+        <Mic size={label ? 13 : 12} />
+        {label && <span>{on ? "Stop" : label}</span>}
       </button>
     </span>
   );
