@@ -428,7 +428,7 @@ export default function WeeklyOutlookPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Weekly Bias</p>
-              <VoiceMic onText={t => update({ biasNote: appendNote(entry.biasNote, t) })} />
+              <VoiceMic label="Voice note" onText={t => update({ biasNote: appendNote(entry.biasNote, t) })} />
             </div>
             <input value={entry.biasNote}
               onChange={e => update({ biasNote: e.target.value })}
@@ -441,7 +441,7 @@ export default function WeeklyOutlookPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className="font-sans text-sm font-medium" style={{ color: "#A0A0A0" }}>Analysis / Game Plan</p>
-              <VoiceMic onText={t => update({ analysis: appendNote(entry.analysis, t) })} />
+              <VoiceMic label="Voice note" onText={t => update({ analysis: appendNote(entry.analysis, t) })} />
             </div>
             <textarea value={entry.analysis}
               onChange={e => update({ analysis: e.target.value })}

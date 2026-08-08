@@ -236,7 +236,8 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
           {/* Per-tf note */}
           <div className="flex items-center justify-between mt-2 mb-1">
             <p className="font-mono text-[9px] uppercase tracking-widest" style={{ color: "#555" }}>Note · {activeTf}</p>
-            <VoiceMic onText={txt => setTfNotes(p => ({ ...p, [activeTf]: appendNote(p[activeTf], txt) }))} />
+            <VoiceMic label="Voice note"
+              onText={txt => setTfNotes(p => ({ ...p, [activeTf]: appendNote(p[activeTf], txt) }))} />
           </div>
           <textarea
             value={tfNotes[activeTf] ?? ""}

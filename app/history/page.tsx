@@ -513,7 +513,7 @@ export default function HistoryPage() {
                     <div className="w-2 h-2 rounded-full bg-[#F5A623]" />
                     <p className="font-mono text-xs font-bold text-white">Trade Notes & Lessons</p>
                   </div>
-                  <VoiceMic onText={t => setEditNotes(p => appendNote(p, t))} />
+                  <VoiceMic label="Voice note" onText={t => setEditNotes(p => appendNote(p, t))} />
                 </div>
                 <textarea value={editNotes}
                   onChange={e => setEditNotes(e.target.value)}
