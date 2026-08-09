@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
+import { VoiceNote } from "@/components/VoiceNote";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
 const STORE_KEY = "sabar-outlook-entries";
@@ -449,6 +450,9 @@ export default function WeeklyOutlookPage() {
               rows={4}
               className="w-full font-sans text-sm text-white px-4 py-3 rounded-xl focus:outline-none placeholder-[#555] resize-none leading-relaxed"
               style={{ background: "#101010", border: "1px solid #262626" }} />
+            <div className="mt-2">
+              <VoiceNote fieldKey={`outlook-${entry.id}-analysis`} />
+            </div>
           </div>
 
           {/* Chart image */}
@@ -519,8 +523,11 @@ export default function WeeklyOutlookPage() {
                       onChange={e => updateChart(chart.id, { note: e.target.value })}
                       placeholder="Write notes about this chart..."
                       rows={3}
-                      className="w-full mt-2.5 mb-3 mx-3 font-sans text-sm text-white px-3 py-2.5 rounded-lg focus:outline-none placeholder-[#555] resize-none leading-relaxed"
+                      className="w-full mt-2.5 mx-3 font-sans text-sm text-white px-3 py-2.5 rounded-lg focus:outline-none placeholder-[#555] resize-none leading-relaxed"
                       style={{ background: "#101010", border: "1px solid #262626", width: "calc(100% - 1.5rem)" }} />
+                    <div className="px-3 pb-3 pt-2">
+                      <VoiceNote fieldKey={`chart-${entry.id}-${chart.id}`} />
+                    </div>
                   </div>
                 );
               })}

@@ -4,6 +4,7 @@ import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
 import { Camera, X, Upload, ZoomIn, ZoomOut, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
+import { VoiceNote } from "@/components/VoiceNote";
 import { imgLoadTrade } from "@/lib/db";
 import { getGrade } from "@/lib/utils";
 
@@ -247,6 +248,9 @@ export function ChartSnapshotPanel({ trade, onClose }: { trade: Trade; onClose: 
             className="w-full px-3 py-2.5 rounded-lg font-mono text-xs text-white placeholder-[#444] focus:outline-none resize-none"
             style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}
           />
+          <div className="mt-2">
+            <VoiceNote fieldKey={`snap-${trade.id}-${activeTf}`} />
+          </div>
         </div>
 
         {/* Save */}

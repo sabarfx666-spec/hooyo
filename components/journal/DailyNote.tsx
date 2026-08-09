@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { FileText, X, Plus, Trash2 } from "lucide-react";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
+import { VoiceNote } from "@/components/VoiceNote";
 
 const STORE_KEY = "sabar-daily-notes";
 const RED = "#E53E3E";
@@ -137,6 +138,9 @@ export function DailyNote() {
                 rows={4}
                 className="w-full bg-transparent font-sans text-sm text-white placeholder-[#555] focus:outline-none resize-none leading-relaxed"
               />
+              <div className="mt-2">
+                <VoiceNote fieldKey={`daily-${day}-${note.id}`} />
+              </div>
             </div>
           ))}
 

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { VoiceMic, appendNote } from "@/components/VoiceMic";
+import { VoiceNote } from "@/components/VoiceNote";
 import { imgLoadTrade } from "@/lib/db";
 import { ChartSnapshotPanel } from "@/components/journal/ChartSnapshotPanel";
 
@@ -523,6 +524,9 @@ export default function HistoryPage() {
                   className="w-full px-3 py-2.5 rounded-lg font-mono text-xs text-white placeholder-[#333] focus:outline-none resize-none"
                   style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }} />
                 <p className="mt-1.5 font-mono text-[9px]" style={{ color: "#333" }}>Saved automatically</p>
+                <div className="mt-2">
+                  <VoiceNote fieldKey={`trade-${selected.id}`} />
+                </div>
               </div>
             </div>
           ) : (
