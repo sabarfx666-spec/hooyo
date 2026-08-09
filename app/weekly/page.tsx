@@ -11,6 +11,17 @@ import { VoiceNote } from "@/components/VoiceNote";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
 const STORE_KEY = "sabar-outlook-entries";
+
+/** Month pills — "" is the All chip, the rest match the MM slice of an ISO date. */
+const MONTHS = [
+  { value: "",   label: "All" },
+  { value: "01", label: "Jan" }, { value: "02", label: "Feb" },
+  { value: "03", label: "Mar" }, { value: "04", label: "Apr" },
+  { value: "05", label: "May" }, { value: "06", label: "Jun" },
+  { value: "07", label: "Jul" }, { value: "08", label: "Aug" },
+  { value: "09", label: "Sep" }, { value: "10", label: "Oct" },
+  { value: "11", label: "Nov" }, { value: "12", label: "Dec" },
+];
 // "legacy" keeps the pre-multi-chart key so older outlooks still find their image.
 const chartImgKey = (entryId: string, chartId: string) =>
   chartId === "legacy" ? `outlook_${entryId}` : `outlook_${entryId}_${chartId}`;
@@ -76,6 +87,8 @@ export default function WeeklyOutlookPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterPair, setFilterPair] = useState("");
   const [filterBias, setFilterBias] = useState("");
+  /** "" = All months, otherwise "01".."12" matched against the entry date. */
+  const [filterMonth, setFilterMonth] = useState("");
   const [chartImages, setChartImages] = useState<Record<string, string>>({});
   const [dragOver, setDragOver]     = useState(false);
   const [loaded, setLoaded]         = useState(false);
@@ -223,8 +236,9 @@ export default function WeeklyOutlookPage() {
 
   const sorted   = [...entries].sort((a, b) => b.date.localeCompare(a.date));
   const filtered = sorted.filter(e =>
-    (!filterPair || e.pair === filterPair) &&
-    (!filterBias || e.bias === filterBias)
+    (!filterPair  || e.pair === filterPair) &&
+    (!filterBias  || e.bias === filterBias) &&
+    (!filterMonth || e.date.slice(5, 7) === filterMonth)
   );
   const pairOptions = Array.from(new Set([...PAIRS, ...entries.map(e => e.pair)]));
 
@@ -270,6 +284,27 @@ export default function WeeklyOutlookPage() {
             <option value="BEARISH">Bearish</option>
             <option value="NEUTRAL">Neutral</option>
           </select>
+        </div>
+
+        {/* Month filter */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {MONTHS.map(m => {
+            const active = filterMonth === m.value;
+            return (
+              <button key={m.value}
+                onClick={() => setFilterMonth(m.value)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-sans text-[11px] font-semibold transition-all"
+                style={{
+                  background: active ? RED : "#141414",
+                  border: `1px solid ${active ? RED : "#2A2A2A"}`,
+                  color: active ? "#FFF" : "#8A8A8A",
+                  boxShadow: active ? `0 0 10px ${RED}55` : "none",
+                }}>
+                {m.value && <TrendingUp size={11} strokeWidth={2.5} />}
+                {m.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Entry list */}
