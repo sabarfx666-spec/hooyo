@@ -54,13 +54,13 @@ export function DailyNote() {
 
   return (
     <>
-      {/* Left-edge trigger — sits below the calculator and cloud badge */}
+      {/* Left-edge trigger — sits directly below the calculator */}
       <button
         onClick={() => setOpen(true)}
         title="Daily Note"
         className="fixed left-0 z-40 flex items-center justify-center w-10 h-10 rounded-r-xl transition-all hover:w-12"
         style={{
-          top: "calc(50% + 116px)",
+          top: "calc(50% + 58px)",
           background: "rgba(229,62,62,0.15)",
           border: "1px solid rgba(229,62,62,0.4)",
           borderLeft: "none",

@@ -6,8 +6,7 @@ import { imgPendingUploads } from "@/lib/db";
  * Blocks accidental tab-close while chart images are still uploading to the
  * cloud — closing the page mid-upload is how images get lost.
  *
- * Renders nothing: the upload chip is intentionally hidden. The left-edge
- * CloudBadge already tells the user trades save to the cloud automatically.
+ * Renders nothing: the upload chip is intentionally hidden.
  */
 export function CloudStatus() {
   useEffect(() => {

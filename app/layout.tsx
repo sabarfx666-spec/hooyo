@@ -7,7 +7,6 @@ import { Topbar } from "@/components/layout/Topbar";
 import { AuthGuard } from "@/components/layout/AuthGuard";
 import { PositionCalculator } from "@/components/journal/PositionCalculator";
 import { CloudStatus } from "@/components/layout/CloudStatus";
-import { CloudBadge } from "@/components/layout/CloudBadge";
 import { DailyNote } from "@/components/journal/DailyNote";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
@@ -29,7 +28,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <AuthGuard>
               <Topbar />
               <PositionCalculator />
-              <CloudBadge />
               <DailyNote />
               <main className="flex-1 p-4 md:p-6 overflow-auto">
                 {children}
