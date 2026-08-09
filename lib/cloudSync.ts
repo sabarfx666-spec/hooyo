@@ -2,8 +2,34 @@ import { getSupabase } from "./supabase";
 import { currentSpaceId } from "./spaces";
 import { SabarState, Trade } from "@/store/types";
 
-/** localStorage keys synced to the cloud alongside the main journal state. */
+/**
+ * localStorage keys synced to the cloud alongside the main journal state.
+ *
+ * Anything written to localStorage but left off this list lives on one browser
+ * only — it does not follow the user to another device and does not survive
+ * clearing site data. Add new keys here as features are built.
+ *
+ * Deliberately NOT synced: image/audio blobs (they go to Supabase Storage via
+ * lib/db.ts, not into this row), device preferences (sabar-theme,
+ * sabar-outlook-month), the auth session, and transient caches.
+ */
 const EXTRA_KEYS = [
+  // Weekly Outlook — the entries themselves; chart images ride along in Storage
+  "sabar-outlook-entries",
+  // Daily Note drawer
+  "sabar-daily-notes",
+  // Plan mind map
+  "sabar-plan-map",
+  // Voice notes: which clip belongs to which field. The audio is in Storage, so
+  // without this the recordings survive but nothing knows where they belong.
+  "sabar-voice-clips",
+  "sabar-profile-avatar",
+  "sabar-custom-rituals",
+  "sabar-daily-ritual",
+  "sabar-ritual-skip",
+  "sabar-psych-note",
+  // Superseded by sabar-outlook-entries. Kept so existing cloud copies of the
+  // old format aren't stranded on accounts that still have them.
   "sabar-weekly-outlook",
   "sabar-weekly-saved-pairs",
   "sabar-trading-accounts",
