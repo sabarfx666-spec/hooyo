@@ -12,9 +12,8 @@ import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
 const STORE_KEY = "sabar-outlook-entries";
 
-/** Month pills — "" is the All chip, the rest match the MM slice of an ISO date. */
+/** Month pills — each value matches the MM slice of an ISO date. */
 const MONTHS = [
-  { value: "",   label: "All" },
   { value: "01", label: "Jan" }, { value: "02", label: "Feb" },
   { value: "03", label: "Mar" }, { value: "04", label: "Apr" },
   { value: "05", label: "May" }, { value: "06", label: "Jun" },
@@ -292,7 +291,8 @@ export default function WeeklyOutlookPage() {
             const active = filterMonth === m.value;
             return (
               <button key={m.value}
-                onClick={() => setFilterMonth(m.value)}
+                /* Clicking the active month clears it — that's the way back to every month. */
+                onClick={() => setFilterMonth(active ? "" : m.value)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-sans text-[11px] font-semibold transition-all"
                 style={{
                   background: active ? RED : "#141414",
@@ -300,7 +300,7 @@ export default function WeeklyOutlookPage() {
                   color: active ? "#FFF" : "#8A8A8A",
                   boxShadow: active ? `0 0 10px ${RED}55` : "none",
                 }}>
-                {m.value && <TrendingUp size={11} strokeWidth={2.5} />}
+                <TrendingUp size={11} strokeWidth={2.5} />
                 {m.label}
               </button>
             );
