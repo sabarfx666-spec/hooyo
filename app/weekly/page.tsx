@@ -11,6 +11,7 @@ import { VoiceNote } from "@/components/VoiceNote";
 import { imgSave, imgLoad, imgDelete } from "@/lib/db";
 
 const STORE_KEY = "sabar-outlook-entries";
+const MONTH_KEY = "sabar-outlook-month";
 
 /** Month pills — each value matches the MM slice of an ISO date. */
 const MONTHS = [
@@ -86,7 +87,7 @@ export default function WeeklyOutlookPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterPair, setFilterPair] = useState("");
   const [filterBias, setFilterBias] = useState("");
-  /** "" = All months, otherwise "01".."12" matched against the entry date. */
+  /** "" = every month, otherwise "01".."12" matched against the entry date. */
   const [filterMonth, setFilterMonth] = useState("");
   const [chartImages, setChartImages] = useState<Record<string, string>>({});
   const [dragOver, setDragOver]     = useState(false);
@@ -107,9 +108,21 @@ export default function WeeklyOutlookPage() {
         setEntries(parsed);
         if (parsed.length > 0) setSelectedId(parsed[0].id);
       }
+      // The month chip survives leaving the page — otherwise picking Aug, going
+      // to the checklist and coming back silently drops you into every month.
+      const savedMonth = localStorage.getItem(MONTH_KEY);
+      if (savedMonth) setFilterMonth(savedMonth);
     } catch {}
     setLoaded(true);
   }, []);
+
+  const pickMonth = (mm: string) => {
+    setFilterMonth(mm);
+    try {
+      if (mm) localStorage.setItem(MONTH_KEY, mm);
+      else localStorage.removeItem(MONTH_KEY);
+    } catch {}
+  };
 
   const entry = entries.find(e => e.id === selectedId) ?? null;
   const charts: ChartMeta[] = entry?.charts ?? [];
@@ -158,6 +171,10 @@ export default function WeeklyOutlookPage() {
     const e = newEntry();
     persist([e, ...entries]);
     setSelectedId(e.id);
+    // A new outlook is dated today, so snap the month chip to it — otherwise a
+    // filter on another month hides the entry you just made.
+    const mm = e.date.slice(5, 7);
+    if (filterMonth && filterMonth !== mm) pickMonth(mm);
   }
 
   function removeEntry(id: string) {
@@ -292,7 +309,7 @@ export default function WeeklyOutlookPage() {
             return (
               <button key={m.value}
                 /* Clicking the active month clears it — that's the way back to every month. */
-                onClick={() => setFilterMonth(active ? "" : m.value)}
+                onClick={() => pickMonth(active ? "" : m.value)}
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-sans text-[11px] font-semibold transition-all"
                 style={{
                   background: active ? RED : "#141414",
