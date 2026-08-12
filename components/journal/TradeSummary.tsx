@@ -185,10 +185,24 @@ export function TradeSummary() {
               </div>
             )}
           </div>
-          <span className="font-sans font-black text-4xl leading-none"
-            style={{ color: grade.color, textShadow: `0 0 18px ${grade.color}66` }}>
-            {grade.letter}
-          </span>
+          <div className="flex items-center gap-3">
+            <div className="text-right">
+              <p className="font-sans font-black text-2xl leading-none" style={{ color: grade.color }}>
+                {pct}%
+              </p>
+              <p className="font-sans text-[11px] mt-1" style={{ color: "#8A8A8A" }}>Completion</p>
+            </div>
+            <span className="font-sans font-black text-4xl leading-none"
+              style={{ color: grade.color, textShadow: `0 0 18px ${grade.color}66` }}>
+              {grade.letter}
+            </span>
+          </div>
+        </div>
+
+        {/* Completion bar — tracks the grade colour so bar, % and letter agree */}
+        <div className="h-2 rounded-full overflow-hidden" style={{ background: "#1C1C1C" }}>
+          <div className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, background: grade.color }} />
         </div>
 
         {/* Discord button */}
