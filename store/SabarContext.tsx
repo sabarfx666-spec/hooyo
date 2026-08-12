@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, useEffect, useRef, ReactNode } from "react";
+import React, { createContext, useContext, useReducer, useEffect, useRef, useState, ReactNode } from "react";
 import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
 import { imgSaveTrade, imgLoadTrade, imgDeleteTrade, imgSyncAllToCloud } from "@/lib/db";
 import { cloudEnabled } from "@/lib/supabase";
@@ -17,6 +17,9 @@ import { defaultPairs, defaultRules, sampleTrades } from "./seedData";
 const today = new Date().toISOString().split("T")[0];
 
 const STORAGE_KEY = "sabar-state";
+/** Millisecond stamp of the last local edit, used to decide whether the cloud
+ *  copy is newer than this device's work before letting it overwrite. */
+const LOCAL_EDIT_KEY = "sabar-state-updated";
 
 const mkRule = (id: string, label: string, category: "BASIS"|"ENTRY", opts?: Partial<Rule>): Rule =>
   ({ id, label, category, checked: false, ...opts });
@@ -294,15 +297,19 @@ const SabarContext = createContext<SabarContextValue | null>(null);
 
 export function SabarProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
+  // Nothing is written back to localStorage until the saved journal has been
+  // read in — otherwise the first render saves the seed defaults over real data.
+  const localReady = useRef(false);
 
   // Load from localStorage then rehydrate images from IndexedDB
   useEffect(() => {
     const load = async () => {
       try {
         const raw = localStorage.getItem(STORAGE_KEY);
-        if (!raw) return;
+        if (!raw) { localReady.current = true; return; }
         const saved: Partial<SabarState> = JSON.parse(raw);
         dispatch({ type: "HYDRATE", payload: saved });
+        localReady.current = true;
         // Restore images for every trade from IndexedDB
         if (saved.trades?.length) {
           await Promise.all(
@@ -314,13 +321,14 @@ export function SabarProvider({ children }: { children: ReactNode }) {
             })
           );
         }
-      } catch {}
+      } catch { localReady.current = true; }
     };
     load();
   }, []);
 
   // Save on every state change — strip images so localStorage stays small
   useEffect(() => {
+    if (!localReady.current) return;
     try {
       const stripped = { ...state, trades: state.trades.map(stripImages) };
       try {
@@ -330,23 +338,35 @@ export function SabarProvider({ children }: { children: ReactNode }) {
         const minimal = { ...stripped, trades: [] };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
       }
+      // Stamp the edit so a stale cloud copy can't overwrite it on next load
+      localStorage.setItem(LOCAL_EDIT_KEY, String(Date.now()));
     } catch {}
   }, [state]);
 
   // ── Cloud sync (Supabase) ──────────────────────────────────
   const { user, hydrated } = useAuth();
-  const cloudReady = useRef(false);
+  // State, not a ref: the push effect below has to re-run the moment this flips,
+  // or edits made while the first pull was still in flight never get uploaded.
+  const [cloudReady, setCloudReady] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
 
   // On login: pull the cloud journal; first login uploads this device's data instead
   useEffect(() => {
-    if (!cloudEnabled() || !hydrated || !user) { cloudReady.current = false; return; }
+    if (!cloudEnabled() || !hydrated || !user) { setCloudReady(false); return; }
     let cancelled = false;
     (async () => {
       const cloud = await cloudPull();
       if (cancelled) return;
-      if (cloud?.state) {
+
+      // Only let the cloud overwrite this device when it is genuinely newer.
+      // Without this, deleting a rule and refreshing before the upload finished
+      // brought the rule straight back — the stale cloud copy always won.
+      const localStamp = Number(localStorage.getItem(LOCAL_EDIT_KEY) ?? 0);
+      const cloudStamp = cloud?.updatedAt ? Date.parse(cloud.updatedAt) : 0;
+      const cloudIsNewer = cloudStamp > localStamp;
+
+      if (cloud?.state && cloudIsNewer) {
         applyExtras(cloud.extras);
         dispatch({ type: "HYDRATE", payload: cloud.state });
         // Restore any locally-stored images for the cloud trades
@@ -358,10 +378,11 @@ export function SabarProvider({ children }: { children: ReactNode }) {
           }).catch(() => {});
         }
       } else {
-        // No cloud data yet — migrate this device's journal up
+        // Either no cloud data yet, or this device is ahead — send ours up so
+        // the cloud stops being stale instead of pulling old data down again.
         await cloudPush(stateRef.current);
       }
-      cloudReady.current = true;
+      setCloudReady(true);
       // Safety sweep: upload any local image the cloud doesn't have yet
       imgSyncAllToCloud().catch(() => {});
     })();
@@ -370,19 +391,17 @@ export function SabarProvider({ children }: { children: ReactNode }) {
 
   // Push state changes to the cloud (debounced)
   useEffect(() => {
-    if (!cloudReady.current) return;
+    if (!cloudReady) return;
     const t = setTimeout(() => { cloudPush(stateRef.current); }, 2000);
     return () => clearTimeout(t);
-  }, [state]);
+  }, [state, cloudReady]);
 
   // Periodic push catches changes made outside React state (weekly notes, accounts, habits…)
   useEffect(() => {
-    if (!cloudEnabled()) return;
-    const iv = setInterval(() => {
-      if (cloudReady.current) cloudPush(stateRef.current);
-    }, 20000);
+    if (!cloudEnabled() || !cloudReady) return;
+    const iv = setInterval(() => { cloudPush(stateRef.current); }, 20000);
     return () => clearInterval(iv);
-  }, []);
+  }, [cloudReady]);
 
   // Auto-sync trades to Notion (when connected) a few seconds after they change
   const tradesJson = JSON.stringify(state.trades.map(t => stripImages(t)));

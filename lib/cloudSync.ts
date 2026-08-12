@@ -56,6 +56,9 @@ const EXTRA_KEYS = [
 export interface CloudData {
   state?: Partial<SabarState>;
   extras?: Record<string, string>;
+  /** When this copy was uploaded. Lets a device tell whether the cloud copy is
+   *  older than its own unsaved work, instead of blindly overwriting itself. */
+  updatedAt?: string;
 }
 
 /** Shape of the jsonb column: one CloudData per space. Rows written before
@@ -110,6 +113,7 @@ export async function cloudPush(state: SabarState): Promise<boolean> {
   const payload: CloudData = {
     state: { ...state, trades: state.trades.map(stripImages) },
     extras,
+    updatedAt: new Date().toISOString(),
   };
 
   // Read the existing row so other spaces survive the write
