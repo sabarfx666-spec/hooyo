@@ -31,7 +31,10 @@ export function RulesList({ category }: RulesListProps) {
   const ACCENT    = biasColor;
 
   const biasSet   = state.biasRules?.[bias] ?? [];
-  const rules     = biasSet.filter(r => r.category === category);
+  // Template rules can be scoped to one session; built-in rules have no scope
+  const rules     = biasSet.filter(r =>
+    r.category === category &&
+    (!r.session || r.session === "BOTH" || r.session === state.currentSession));
   const checked   = rules.filter(r => r.checked).length;
   const total     = rules.length;
   const pct       = total > 0 ? Math.round((checked / total) * 100) : 0;

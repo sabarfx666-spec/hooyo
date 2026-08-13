@@ -14,10 +14,25 @@ export interface TemplateRule {
   id: string;
   label: string;
   category: "BASIS" | "ENTRY";
-  tag?: "EITHER_OR";
+  /** Which direction / session this rule shows up for. */
+  directionScope: DirectionScope;
+  sessionScope: SessionScope;
+  /** Required rules are plain; optional ones render as Either/Or alternatives. */
+  required: boolean;
+  /** Sub-rules, drawn indented under their parent on the checklist. */
+  children?: TemplateRule[];
   note?: string;
-  indent?: boolean;
 }
+
+export const newRule = (): TemplateRule => ({
+  id: `r-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+  label: "",
+  category: "BASIS",
+  directionScope: "BOTH",
+  sessionScope: "BOTH",
+  required: true,
+  children: [],
+});
 
 export interface TemplateSlot {
   id: string;

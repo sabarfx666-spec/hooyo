@@ -4,14 +4,14 @@ import { createPortal } from "react-dom";
 import { useSabar, defaultBiasRules } from "@/store/SabarContext";
 import { Rule, BiasRuleSet } from "@/store/types";
 import {
-  Layers, ChevronDown, Plus, Pencil, Trash2, X, Save, Camera,
+  Layers, ChevronDown, Plus, Pencil, Trash2, X, Save, Camera, ArrowUp, ArrowDown,
 } from "lucide-react";
 import {
   ChecklistTemplate, TemplateRule, TemplateSlot,
   DIRECTION_SCOPES, SESSION_SCOPES, DEFAULT_SLOTS, MAX_SLOTS,
   SYSTEM_TEMPLATE_ID, SYSTEM_TEMPLATE_NAME, TEMPLATES_EVENT,
   loadTemplates, saveTemplates, activeTemplateId, setActiveTemplateId,
-  applySlots, emptyTemplate, scopeChips,
+  applySlots, emptyTemplate, scopeChips, newRule,
 } from "@/lib/templates";
 
 const RED = "#E53E3E";
@@ -35,20 +35,126 @@ function Portal({ children }: { children: ReactNode }) {
   return host ? createPortal(children, host) : null;
 }
 
-/** A template's rules become the live checklist for both directions. */
+/**
+ * Flatten a template into the live checklist, once per direction. Rules scoped
+ * to the other direction are dropped; children follow their parent indented.
+ * "Required off" is what draws the Either/Or badge on the checklist.
+ */
 const toBiasRules = (rules: TemplateRule[]): BiasRuleSet => {
-  const mk = (prefix: string): Rule[] =>
-    rules.map(r => ({
-      id: `${prefix}-${r.id}`,
-      label: r.label,
-      category: r.category,
-      checked: false,
-      ...(r.tag ? { tag: r.tag } : {}),
-      ...(r.note ? { note: r.note } : {}),
-      ...(r.indent ? { indent: r.indent } : {}),
-    }));
-  return { BULLISH: mk("bull"), BEARISH: mk("bear") };
+  const mk = (r: TemplateRule, bias: string, indent: boolean): Rule => ({
+    id: `${bias}-${r.id}`,
+    label: r.label,
+    category: r.category,
+    checked: false,
+    session: r.sessionScope,
+    ...(r.required ? {} : { tag: "EITHER_OR" as const }),
+    ...(r.note ? { note: r.note } : {}),
+    ...(indent ? { indent: true } : {}),
+  });
+
+  const inScope = (r: TemplateRule, bias: "BULLISH" | "BEARISH") =>
+    r.directionScope === "BOTH" || r.directionScope === bias;
+
+  const build = (bias: "BULLISH" | "BEARISH"): Rule[] => {
+    const out: Rule[] = [];
+    for (const r of rules) {
+      if (!inScope(r, bias)) continue;
+      out.push(mk(r, bias, false));
+      for (const c of r.children ?? []) {
+        if (inScope(c, bias)) out.push(mk(c, bias, true));
+      }
+    }
+    return out;
+  };
+
+  return { BULLISH: build("BULLISH"), BEARISH: build("BEARISH") };
 };
+
+/* ────────────────────────── Rule row ────────────────────────── */
+
+const selCls =
+  "px-2.5 py-2 rounded-lg font-sans text-xs text-white focus:outline-none cursor-pointer";
+const selStyle = { background: "#141414", border: "1px solid #262626" };
+
+function RuleRow({ rule, isChild, canUp, canDown, onPatch, onRemove, onMove, onAddChild }: {
+  rule: TemplateRule;
+  isChild: boolean;
+  canUp: boolean;
+  canDown: boolean;
+  onPatch: (p: Partial<TemplateRule>) => void;
+  onRemove: () => void;
+  onMove: (dir: -1 | 1) => void;
+  onAddChild?: () => void;
+}) {
+  return (
+    <div className="rounded-xl p-3 space-y-2.5" style={FIELD}>
+      {/* Label + reorder + delete */}
+      <div className="flex items-center gap-2">
+        <input value={rule.label} placeholder={isChild ? "Child rule label..." : "Rule label..."}
+          className="flex-1 px-3 py-2 rounded-lg font-sans text-sm text-white placeholder-[#555] focus:outline-none"
+          style={selStyle}
+          onChange={e => onPatch({ label: e.target.value })} />
+        <button onClick={() => onMove(-1)} disabled={!canUp} title="Move up"
+          className="p-1.5 shrink-0 transition-colors"
+          style={{ color: canUp ? "#8A8A8A" : "#333", cursor: canUp ? "pointer" : "not-allowed" }}>
+          <ArrowUp size={16} />
+        </button>
+        <button onClick={() => onMove(1)} disabled={!canDown} title="Move down"
+          className="p-1.5 shrink-0 transition-colors"
+          style={{ color: canDown ? "#8A8A8A" : "#333", cursor: canDown ? "pointer" : "not-allowed" }}>
+          <ArrowDown size={16} />
+        </button>
+        <button onClick={onRemove} title="Delete rule"
+          className="p-1.5 shrink-0 transition-colors hover:opacity-70" style={{ color: RED }}>
+          <Trash2 size={16} />
+        </button>
+      </div>
+
+      {/* Category · direction · session */}
+      <div className="grid grid-cols-3 gap-2">
+        <select value={rule.category} className={selCls} style={selStyle}
+          onChange={e => onPatch({ category: e.target.value as TemplateRule["category"] })}>
+          <option value="BASIS" style={selStyle}>HTF</option>
+          <option value="ENTRY" style={selStyle}>LTF</option>
+        </select>
+        <select value={rule.directionScope} className={selCls} style={selStyle}
+          onChange={e => onPatch({ directionScope: e.target.value as TemplateRule["directionScope"] })}>
+          {DIRECTION_SCOPES.map(s => (
+            <option key={s.value} value={s.value} style={selStyle}>{s.label}</option>
+          ))}
+        </select>
+        <select value={rule.sessionScope} className={selCls} style={selStyle}
+          onChange={e => onPatch({ sessionScope: e.target.value as TemplateRule["sessionScope"] })}>
+          {SESSION_SCOPES.map(s => (
+            <option key={s.value} value={s.value} style={selStyle}>{s.label}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Required toggle */}
+      <div className="flex items-center gap-2.5">
+        <button onClick={() => onPatch({ required: !rule.required })}
+          title={rule.required ? "Required rule" : "Optional — shows as Either/Or"}
+          className="relative w-10 h-5 rounded-full shrink-0 transition-colors"
+          style={{ background: rule.required ? RED : "#2A2A2A" }}>
+          <span className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all"
+            style={{ left: rule.required ? 22 : 2 }} />
+        </button>
+        <span className="font-sans text-sm" style={{ color: rule.required ? "#D0D0D0" : "#666" }}>
+          {rule.required ? "Required" : "Either/Or"}
+        </span>
+      </div>
+
+      {onAddChild && (
+        <button onClick={onAddChild}
+          className="flex items-center gap-1.5 font-sans text-sm transition-colors hover:text-white"
+          style={{ color: "#8A8A8A" }}>
+          <Plus size={15} /> Add Child Rule
+        </button>
+      )}
+    </div>
+  );
+}
 
 /* ────────────────────────── Create Template modal ────────────────────────── */
 
@@ -153,11 +259,46 @@ function EditTemplateModal({ template, allTemplates, onBack, onSave, onPick }: {
     patch({ slots: draft.slots.map(s => s.id === id ? { ...s, [field]: v } : s) });
   const removeSlot = (id: string) => patch({ slots: draft.slots.filter(s => s.id !== id) });
 
-  const addRule = () =>
-    patch({ rules: [...draft.rules, { id: `r-${Date.now()}`, label: "", category: "BASIS" }] });
+  const addRule = () => patch({ rules: [...draft.rules, newRule()] });
+
   const updateRule = (id: string, p: Partial<TemplateRule>) =>
     patch({ rules: draft.rules.map(r => r.id === id ? { ...r, ...p } : r) });
   const removeRule = (id: string) => patch({ rules: draft.rules.filter(r => r.id !== id) });
+
+  /** Swap a rule with its neighbour to reorder the checklist. */
+  const moveRule = (index: number, dir: -1 | 1) => {
+    const to = index + dir;
+    if (to < 0 || to >= draft.rules.length) return;
+    const next = [...draft.rules];
+    [next[index], next[to]] = [next[to], next[index]];
+    patch({ rules: next });
+  };
+
+  const addChild = (parentId: string) =>
+    patch({ rules: draft.rules.map(r =>
+      r.id === parentId ? { ...r, children: [...(r.children ?? []), newRule()] } : r) });
+
+  const patchChild = (parentId: string, childId: string, p: Partial<TemplateRule>) =>
+    patch({ rules: draft.rules.map(r =>
+      r.id === parentId
+        ? { ...r, children: (r.children ?? []).map(c => c.id === childId ? { ...c, ...p } : c) }
+        : r) });
+
+  const removeChild = (parentId: string, childId: string) =>
+    patch({ rules: draft.rules.map(r =>
+      r.id === parentId
+        ? { ...r, children: (r.children ?? []).filter(c => c.id !== childId) }
+        : r) });
+
+  const moveChild = (parentId: string, index: number, dir: -1 | 1) =>
+    patch({ rules: draft.rules.map(r => {
+      if (r.id !== parentId) return r;
+      const kids = [...(r.children ?? [])];
+      const to = index + dir;
+      if (to < 0 || to >= kids.length) return r;
+      [kids[index], kids[to]] = [kids[to], kids[index]];
+      return { ...r, children: kids };
+    }) });
 
   return (
     <Portal>
@@ -290,40 +431,28 @@ function EditTemplateModal({ template, allTemplates, onBack, onSave, onPick }: {
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
-                {draft.rules.map(rule => (
-                  <div key={rule.id} className="flex items-center gap-2 p-2 rounded-xl" style={FIELD}>
-                    <input value={rule.label} placeholder="Rule text"
-                      className="flex-1 px-2.5 py-1.5 rounded-lg font-sans text-xs text-white placeholder-[#555] focus:outline-none"
-                      style={{ background: "#141414", border: "1px solid #262626" }}
-                      onChange={e => updateRule(rule.id, { label: e.target.value })} />
-                    <select value={rule.category}
-                      className="px-2 py-1.5 rounded-lg font-sans text-[11px] text-white focus:outline-none cursor-pointer shrink-0"
-                      style={{ background: "#141414", border: "1px solid #262626" }}
-                      onChange={e => updateRule(rule.id, { category: e.target.value as TemplateRule["category"] })}>
-                      <option value="BASIS" style={{ background: "#141414" }}>HTF Bias</option>
-                      <option value="ENTRY" style={{ background: "#141414" }}>LTF Entry</option>
-                    </select>
-                    <button onClick={() => updateRule(rule.id, { tag: rule.tag ? undefined : "EITHER_OR" })}
-                      title="Either/Or rule"
-                      className="px-2 py-1.5 rounded-lg font-sans text-[11px] font-semibold shrink-0 transition-all"
-                      style={rule.tag
-                        ? { background: "rgba(34,197,94,0.12)", border: "1px solid rgba(34,197,94,0.4)", color: "#22C55E" }
-                        : { background: "#141414", border: "1px solid #262626", color: "#555" }}>
-                      Either/Or
-                    </button>
-                    <button onClick={() => updateRule(rule.id, { indent: !rule.indent })}
-                      title="Indent as a sub-rule"
-                      className="px-2 py-1.5 rounded-lg font-sans text-[11px] font-semibold shrink-0 transition-all"
-                      style={rule.indent
-                        ? { background: "rgba(229,62,62,0.12)", border: `1px solid ${RED}66`, color: RED }
-                        : { background: "#141414", border: "1px solid #262626", color: "#555" }}>
-                      Indent
-                    </button>
-                    <button onClick={() => removeRule(rule.id)} title="Remove rule"
-                      className="p-1.5 shrink-0 text-[#555] hover:text-[#EF4444] transition-colors">
-                      <Trash2 size={14} />
-                    </button>
+              <div className="space-y-2.5">
+                {draft.rules.map((rule, i) => (
+                  <div key={rule.id} className="space-y-2">
+                    <RuleRow
+                      rule={rule} isChild={false}
+                      canUp={i > 0} canDown={i < draft.rules.length - 1}
+                      onPatch={p => updateRule(rule.id, p)}
+                      onRemove={() => removeRule(rule.id)}
+                      onMove={dir => moveRule(i, dir)}
+                      onAddChild={() => addChild(rule.id)}
+                    />
+                    {(rule.children ?? []).map((child, ci) => (
+                      <div key={child.id} className="ml-6">
+                        <RuleRow
+                          rule={child} isChild
+                          canUp={ci > 0} canDown={ci < (rule.children ?? []).length - 1}
+                          onPatch={p => patchChild(rule.id, child.id, p)}
+                          onRemove={() => removeChild(rule.id, child.id)}
+                          onMove={dir => moveChild(rule.id, ci, dir)}
+                        />
+                      </div>
+                    ))}
                   </div>
                 ))}
               </div>

@@ -27,6 +27,9 @@ export interface Rule {
   tag?: "EITHER_OR";
   note?: string;
   indent?: boolean;
+  /** From a checklist template: hide the rule outside this session.
+   *  Undefined (built-in rules) means "always show". */
+  session?: "BOTH" | "ASIAN" | "LONDON" | "NEW_YORK";
 }
 
 export type BiasRuleSet = Record<"BULLISH" | "BEARISH", Rule[]>;
