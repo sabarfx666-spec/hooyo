@@ -16,8 +16,10 @@ export default function Dashboard() {
       {/* Daily pre-market readiness check — shows once per day */}
       <DailyRitual />
 
-      {/* Which checklist is in play */}
-      <div className="anim-fade-up d-100"><ChecklistTemplateBar /></div>
+      {/* Which checklist is in play. relative z-50 lifts the whole animated
+          wrapper above the selectors below — anim-fade-up makes its own
+          stacking layer, so the dropdown's z-index can't escape it otherwise. */}
+      <div className="anim-fade-up d-100 relative z-50"><ChecklistTemplateBar /></div>
 
       {/* Selectors */}
       <div className="anim-fade-up d-100"><BiasSelector /></div>
