@@ -1,5 +1,6 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useSabar, defaultBiasRules } from "@/store/SabarContext";
 import { Rule, BiasRuleSet } from "@/store/types";
 import {
@@ -21,6 +22,18 @@ const FIELD  = { background: "#0A0A0A", border: "1px solid #262626" };
 const inputCls =
   "w-full px-3.5 py-2.5 rounded-xl font-sans text-sm text-white placeholder-[#555] focus:outline-none";
 const labelCls = "font-sans text-sm font-medium mb-1.5 block";
+
+/**
+ * Modals render into <body>. The bar sits inside an .anim-fade-up wrapper, and
+ * that animation's transform makes the wrapper the containing block for any
+ * position:fixed child — which centred these modals on the bar instead of the
+ * window and pushed their titles off the top of the screen.
+ */
+function Portal({ children }: { children: ReactNode }) {
+  const [host, setHost] = useState<HTMLElement | null>(null);
+  useEffect(() => setHost(document.body), []);
+  return host ? createPortal(children, host) : null;
+}
 
 /** A template's rules become the live checklist for both directions. */
 const toBiasRules = (rules: TemplateRule[]): BiasRuleSet => {
@@ -47,8 +60,9 @@ function CreateTemplateModal({ onCancel, onCreate }: {
   const canCreate = draft.name.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
-      <div className="w-full max-w-xl rounded-2xl p-6 space-y-5" style={MODAL}>
+    <Portal>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="w-full max-w-xl my-auto rounded-2xl p-6 space-y-5" style={MODAL}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Layers size={19} style={{ color: RED }} />
@@ -110,6 +124,7 @@ function CreateTemplateModal({ onCancel, onCreate }: {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -145,6 +160,7 @@ function EditTemplateModal({ template, allTemplates, onBack, onSave, onPick }: {
   const removeRule = (id: string) => patch({ rules: draft.rules.filter(r => r.id !== id) });
 
   return (
+    <Portal>
     <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
       <div className="w-full max-w-3xl max-h-[88vh] rounded-2xl flex flex-col" style={MODAL}>
 
@@ -330,6 +346,7 @@ function EditTemplateModal({ template, allTemplates, onBack, onSave, onPick }: {
         </div>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -343,8 +360,9 @@ function ManageTemplatesModal({ templates, onClose, onCreate, onEdit, onDelete }
   onDelete: (id: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.75)" }}>
-      <div className="w-full max-w-lg rounded-2xl p-6 space-y-4" style={MODAL}>
+    <Portal>
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 overflow-y-auto" style={{ background: "rgba(0,0,0,0.75)" }}>
+      <div className="w-full max-w-lg my-auto rounded-2xl p-6 space-y-4" style={MODAL}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <Layers size={19} style={{ color: RED }} />
@@ -397,6 +415,7 @@ function ManageTemplatesModal({ templates, onClose, onCreate, onEdit, onDelete }
         </button>
       </div>
     </div>
+    </Portal>
   );
 }
 
@@ -494,8 +513,11 @@ export function ChecklistTemplateBar() {
 
           {open && (
             <>
-              {/* Click-away catcher */}
-              <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              {/* Click-away catcher — portaled so it covers the whole window,
+                  not just the animated wrapper's box */}
+              <Portal>
+                <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+              </Portal>
               <div className="absolute left-0 top-full mt-1 w-72 z-50 rounded-xl overflow-hidden py-1"
                 style={{ background: "#0A0A0A", border: "1px solid #262626", boxShadow: "0 12px 32px rgba(0,0,0,0.7)" }}>
 
