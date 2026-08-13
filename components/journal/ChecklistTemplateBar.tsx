@@ -60,8 +60,10 @@ const toBiasRules = (rules: TemplateRule[]): BiasRuleSet => {
     for (const r of rules) {
       if (!inScope(r, bias)) continue;
       out.push(mk(r, bias, false));
+      // A child is an alternative of its parent, so it takes the parent's
+      // category and scope — only its label and position are its own.
       for (const c of r.children ?? []) {
-        if (inScope(c, bias)) out.push(mk(c, bias, true));
+        out.push(mk({ ...r, id: c.id, label: c.label, children: [] }, bias, true));
       }
     }
     return out;
@@ -76,9 +78,29 @@ const selCls =
   "px-2.5 py-2 rounded-lg font-sans text-xs text-white focus:outline-none cursor-pointer";
 const selStyle = { background: "#141414", border: "1px solid #262626" };
 
-function RuleRow({ rule, isChild, canUp, canDown, onPatch, onRemove, onMove, onAddChild }: {
+/** Children are alternatives of their parent — just a label and a delete. */
+function ChildRuleRow({ rule, onPatch, onRemove }: {
   rule: TemplateRule;
-  isChild: boolean;
+  onPatch: (p: Partial<TemplateRule>) => void;
+  onRemove: () => void;
+}) {
+  return (
+    <div className="flex items-center gap-2.5 rounded-xl p-3" style={FIELD}>
+      <span className="shrink-0 font-sans text-sm" style={{ color: RED }}>↳</span>
+      <input value={rule.label} placeholder="Child rule label..."
+        className="flex-1 px-3 py-2 rounded-lg font-sans text-sm text-white placeholder-[#555] focus:outline-none"
+        style={selStyle}
+        onChange={e => onPatch({ label: e.target.value })} />
+      <button onClick={onRemove} title="Delete child rule"
+        className="p-1.5 shrink-0 transition-colors hover:opacity-70" style={{ color: RED }}>
+        <Trash2 size={16} />
+      </button>
+    </div>
+  );
+}
+
+function RuleRow({ rule, canUp, canDown, onPatch, onRemove, onMove, onAddChild }: {
+  rule: TemplateRule;
   canUp: boolean;
   canDown: boolean;
   onPatch: (p: Partial<TemplateRule>) => void;
@@ -86,11 +108,14 @@ function RuleRow({ rule, isChild, canUp, canDown, onPatch, onRemove, onMove, onA
   onMove: (dir: -1 | 1) => void;
   onAddChild?: () => void;
 }) {
+  // An Either/Or group is the rule plus its alternatives
+  const groupSize = 1 + (rule.children?.length ?? 0);
+
   return (
     <div className="rounded-xl p-3 space-y-2.5" style={FIELD}>
       {/* Label + reorder + delete */}
       <div className="flex items-center gap-2">
-        <input value={rule.label} placeholder={isChild ? "Child rule label..." : "Rule label..."}
+        <input value={rule.label} placeholder="Rule label..."
           className="flex-1 px-3 py-2 rounded-lg font-sans text-sm text-white placeholder-[#555] focus:outline-none"
           style={selStyle}
           onChange={e => onPatch({ label: e.target.value })} />
@@ -141,8 +166,14 @@ function RuleRow({ rule, isChild, canUp, canDown, onPatch, onRemove, onMove, onA
             style={{ left: rule.required ? 22 : 2 }} />
         </button>
         <span className="font-sans text-sm" style={{ color: rule.required ? "#D0D0D0" : "#666" }}>
-          {rule.required ? "Required" : "Either/Or"}
+          Required
         </span>
+        {!rule.required && (
+          <span className="px-2.5 py-1 rounded-full font-sans text-xs"
+            style={{ background: "#141414", border: "1px solid #2A2A2A", color: "#C0C0C0" }}>
+            Either/Or · {groupSize} rule{groupSize !== 1 ? "s" : ""}
+          </span>
+        )}
       </div>
 
       {onAddChild && (
@@ -290,15 +321,6 @@ function EditTemplateModal({ template, allTemplates, onBack, onSave, onPick }: {
         ? { ...r, children: (r.children ?? []).filter(c => c.id !== childId) }
         : r) });
 
-  const moveChild = (parentId: string, index: number, dir: -1 | 1) =>
-    patch({ rules: draft.rules.map(r => {
-      if (r.id !== parentId) return r;
-      const kids = [...(r.children ?? [])];
-      const to = index + dir;
-      if (to < 0 || to >= kids.length) return r;
-      [kids[index], kids[to]] = [kids[to], kids[index]];
-      return { ...r, children: kids };
-    }) });
 
   return (
     <Portal>
@@ -435,21 +457,20 @@ function EditTemplateModal({ template, allTemplates, onBack, onSave, onPick }: {
                 {draft.rules.map((rule, i) => (
                   <div key={rule.id} className="space-y-2">
                     <RuleRow
-                      rule={rule} isChild={false}
+                      rule={rule}
                       canUp={i > 0} canDown={i < draft.rules.length - 1}
                       onPatch={p => updateRule(rule.id, p)}
                       onRemove={() => removeRule(rule.id)}
                       onMove={dir => moveRule(i, dir)}
                       onAddChild={() => addChild(rule.id)}
                     />
-                    {(rule.children ?? []).map((child, ci) => (
-                      <div key={child.id} className="ml-6">
-                        <RuleRow
-                          rule={child} isChild
-                          canUp={ci > 0} canDown={ci < (rule.children ?? []).length - 1}
+                    {(rule.children ?? []).map(child => (
+                      <div key={child.id} className="ml-4 pl-2"
+                        style={{ borderLeft: `2px solid ${RED}55` }}>
+                        <ChildRuleRow
+                          rule={child}
                           onPatch={p => patchChild(rule.id, child.id, p)}
                           onRemove={() => removeChild(rule.id, child.id)}
-                          onMove={dir => moveChild(rule.id, ci, dir)}
                         />
                       </div>
                     ))}
