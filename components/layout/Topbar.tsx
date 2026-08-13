@@ -165,7 +165,9 @@ export function Topbar() {
   if (!TOPBAR_PATHS.includes(pathname)) return null;
 
   return (
-    <header className="px-4 py-3"
+    // relative z-[60] keeps the account menu above page content — without it
+    // the menu ties on z-50 with panels below and loses on DOM order.
+    <header className="px-4 py-3 relative z-[60]"
       style={{ background: "rgba(10,10,10,0.85)", backdropFilter: "blur(8px)" }}>
       {/* Inner column matches the page content width so the logo lines up with it */}
       <div className="max-w-5xl mx-auto w-full flex items-center justify-between gap-3">
