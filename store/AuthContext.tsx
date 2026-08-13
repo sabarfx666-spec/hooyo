@@ -6,6 +6,9 @@ export interface AuthUser {
   email: string;
   name: string;
   role: "admin" | "user";
+  /** Whether this account is approved on the register. Undefined means the
+   *  account predates the flag and is treated as approved. */
+  approved?: boolean;
 }
 
 export interface StoredAccount {
@@ -102,6 +105,21 @@ async function notifyEmail(name: string, email: string) {
   } catch {}
 }
 
+/**
+ * Approval status for an email, read from the register.
+ *
+ * Accounts that aren't on the register come back approved. Cloud (Supabase)
+ * sign-ups never land on it, so this must not lock them out — it only lets the
+ * register veto accounts it actually knows about.
+ */
+function approvalFor(email: string): boolean {
+  try {
+    const accounts: StoredAccount[] = JSON.parse(localStorage.getItem(ACCOUNTS_KEY) ?? "[]");
+    const found = accounts.find(a => a.email?.toLowerCase() === email.toLowerCase());
+    return found ? found.approved !== false : true;
+  } catch { return true; }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser]         = useState<AuthUser | null>(null);
   const [hydrated, setHydrated] = useState(false);
@@ -117,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: su.email ?? "",
             name:  (su.user_metadata?.name as string) ?? su.email?.split("@")[0] ?? "Trader",
             role:  "admin",
+            approved: approvalFor(su.email ?? ""),
           });
         }
         setHydrated(true);
@@ -127,6 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: su.email ?? "",
           name:  (su.user_metadata?.name as string) ?? su.email?.split("@")[0] ?? "Trader",
           role:  "admin",
+          approved: approvalFor(su.email ?? ""),
         } : null);
       });
       return () => sub.subscription.unsubscribe();
@@ -163,6 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           email: parsed.email,
           name:  parsed.name,
           role:  found?.role ?? "admin",
+          approved: found ? found.approved !== false : true,
         };
         localStorage.setItem(SESSION_KEY, JSON.stringify(enriched));
         setUser(enriched);
@@ -193,6 +214,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: su.email ?? email,
         name:  (su.user_metadata?.name as string) ?? email.split("@")[0],
         role:  "admin",
+        approved: approvalFor(su.email ?? email),
       });
       return null;
     }
@@ -201,7 +223,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!found) return "No account found with that email.";
     if (found.password !== password) return "Incorrect password.";
     if (!found.approved) return "PENDING_APPROVAL";
-    const u: AuthUser = { email: found.email, name: found.name, role: found.role };
+    const u: AuthUser = { email: found.email, name: found.name, role: found.role, approved: true };
     localStorage.setItem(SESSION_KEY, JSON.stringify(u));
     setUser(u);
     return null;
@@ -221,7 +243,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.session) {
         // Email confirmation disabled — logged in right away
         const su = data.session.user;
-        setUser({ email: su.email ?? email, name, role: "admin" });
+        setUser({ email: su.email ?? email, name, role: "admin", approved: true });
         return null;
       }
       return "Account created! Check your email inbox and click the confirmation link, then log in.";
@@ -239,7 +261,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     saveAccounts([...accounts, newAccount]);
     if (isFirst) {
-      const u: AuthUser = { email, name, role: "admin" };
+      const u: AuthUser = { email, name, role: "admin", approved: true };
       localStorage.setItem(SESSION_KEY, JSON.stringify(u));
       setUser(u);
     } else {

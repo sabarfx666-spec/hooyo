@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback, ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useSabar, defaultBiasRules } from "@/store/SabarContext";
+import { useAuth } from "@/store/AuthContext";
 import { Rule, BiasRuleSet } from "@/store/types";
 import {
   Layers, ChevronDown, Plus, Pencil, Trash2, X, Save, Camera, ArrowUp, ArrowDown,
@@ -573,6 +574,7 @@ function ManageTemplatesModal({ templates, onClose, onCreate, onEdit, onDelete }
 
 export function ChecklistTemplateBar() {
   const { dispatch } = useSabar();
+  const { user } = useAuth();
   const [templates, setTemplates] = useState<ChecklistTemplate[]>([]);
   const [activeId, setActiveId]   = useState(SYSTEM_TEMPLATE_ID);
   const [mounted, setMounted]     = useState(false);
@@ -640,6 +642,9 @@ export function ChecklistTemplateBar() {
   };
 
   if (!mounted) return null;
+  // Templates are for approved accounts only — anyone the register has vetoed
+  // gets the built-in checklist with no picker at all.
+  if (!user || user.approved === false) return null;
 
   return (
     <>
