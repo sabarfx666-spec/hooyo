@@ -2,19 +2,12 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { Camera, Upload, Settings2, Clipboard, Plus, Trash2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { DEFAULT_SLOTS, TEMPLATES_EVENT, TemplateSlot } from "@/lib/templates";
 
 const STORAGE_IMAGES = "sabar-proof-images";
 const STORAGE_SLOTS  = "sabar-proof-slots";
 
-const DEFAULT_SLOTS = [
-  { id: "weekly", label: "Weekly Proof", sub: "1W" },
-  { id: "daily",  label: "Daily Proof",  sub: "1D" },
-  { id: "4h",     label: "4H Proof",     sub: "4H" },
-  { id: "entry",  label: "Entry Proof",  sub: "5m/15m" },
-  { id: "after",  label: "After",        sub: "TP/SL Result" },
-];
-
-type Slot = { id: string; label: string; sub: string };
+type Slot = TemplateSlot;
 
 function SlotCard({ slot, image, onChange }: { slot: Slot; image: string | null; onChange: (url: string | null) => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -152,12 +145,20 @@ export function ChartSnapshots() {
 
   useEffect(() => {
     setMounted(true);
+    const readSlots = () => {
+      try {
+        const storedSlots = localStorage.getItem(STORAGE_SLOTS);
+        if (storedSlots) setSlots(JSON.parse(storedSlots));
+      } catch {}
+    };
+    readSlots();
     try {
-      const storedSlots = localStorage.getItem(STORAGE_SLOTS);
-      if (storedSlots) setSlots(JSON.parse(storedSlots));
       const storedImgs = localStorage.getItem(STORAGE_IMAGES);
       if (storedImgs) setImages(JSON.parse(storedImgs));
     } catch {}
+    // Switching checklist template swaps these slots out from under us
+    window.addEventListener(TEMPLATES_EVENT, readSlots);
+    return () => window.removeEventListener(TEMPLATES_EVENT, readSlots);
   }, []);
 
   const updateImage = (id: string, url: string | null) => {

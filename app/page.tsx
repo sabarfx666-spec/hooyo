@@ -7,6 +7,7 @@ import { RulesList }           from "@/components/journal/RulesList";
 import { TradeSummary }        from "@/components/journal/TradeSummary";
 import { ChartSnapshots }      from "@/components/journal/ChartSnapshots";
 import { DailyRitual }         from "@/components/journal/DailyRitual";
+import { ChecklistTemplateBar } from "@/components/journal/ChecklistTemplateBar";
 
 export default function Dashboard() {
   return (
@@ -14,6 +15,9 @@ export default function Dashboard() {
 
       {/* Daily pre-market readiness check — shows once per day */}
       <DailyRitual />
+
+      {/* Which checklist is in play */}
+      <div className="anim-fade-up d-100"><ChecklistTemplateBar /></div>
 
       {/* Selectors */}
       <div className="anim-fade-up d-100"><BiasSelector /></div>

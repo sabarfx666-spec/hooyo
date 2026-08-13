@@ -23,6 +23,10 @@ const EXTRA_KEYS = [
   // Voice notes: which clip belongs to which field. The audio is in Storage, so
   // without this the recordings survive but nothing knows where they belong.
   "sabar-voice-clips",
+  // Checklist templates and which one is in play
+  "sabar-checklist-templates",
+  "sabar-active-template",
+  "sabar-proof-slots",
   "sabar-profile-avatar",
   "sabar-custom-rituals",
   "sabar-daily-ritual",

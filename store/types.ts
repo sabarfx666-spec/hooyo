@@ -93,6 +93,7 @@ export type Action =
   | { type: "ADD_BIAS_RULE"; payload: { bias: Bias; label: string; category: "BASIS" | "ENTRY" } }
   | { type: "REMOVE_BIAS_RULE"; payload: { bias: Bias; id: string } }
   | { type: "REORDER_BIAS_RULES"; payload: { bias: Bias; category: "BASIS" | "ENTRY"; fromIndex: number; toIndex: number } }
+  | { type: "SET_BIAS_RULES"; payload: BiasRuleSet }
   | { type: "RESET_CHECKLIST" }
   | { type: "DELETE_TRADE"; payload: string }
   | { type: "UPDATE_TRADE"; payload: { id: string; outcome?: Trade["outcome"]; notes?: string; pnl?: number; chartProof?: string | null; chartProofs?: Trade["chartProofs"]; imgBefore?: string | null; imgAfter?: string | null } }

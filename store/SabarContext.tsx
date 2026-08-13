@@ -24,7 +24,7 @@ const LOCAL_EDIT_KEY = "sabar-state-updated";
 const mkRule = (id: string, label: string, category: "BASIS"|"ENTRY", opts?: Partial<Rule>): Rule =>
   ({ id, label, category, checked: false, ...opts });
 
-const defaultBiasRules: BiasRuleSet = {
+export const defaultBiasRules: BiasRuleSet = {
   BULLISH: [
     mkRule("bb1", "Daily Order-flow +DOL",                     "BASIS"),
     mkRule("bb2", "Daily Order-flow +ICR",                     "BASIS", { tag: "EITHER_OR" }),
@@ -143,6 +143,10 @@ function reducer(state: SabarState, action: Action): SabarState {
       const newRule = mkRule(`${bias[0].toLowerCase()}${category[0].toLowerCase()}-${Date.now()}`, label, category);
       return { ...state, biasRules: { ...state.biasRules, [bias]: [...state.biasRules[bias], newRule] } };
     }
+
+    // Swapping checklist templates replaces the whole live rule set at once
+    case "SET_BIAS_RULES":
+      return { ...state, biasRules: action.payload };
 
     case "REMOVE_BIAS_RULE": {
       const { bias, id } = action.payload;
