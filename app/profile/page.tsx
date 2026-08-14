@@ -298,56 +298,160 @@ function MiniBar({ value, max, color }: { value: number; max: number; color: str
   );
 }
 
-function EquityCurve({ trades }: { trades: Trade[] }) {
+/** Compact money label for the axis: $56K, $1.2M, -$800. */
+function axisMoney(n: number) {
+  const abs = Math.abs(n);
+  const sign = n < 0 ? "-" : "";
+  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(1)}M`;
+  if (abs >= 1_000)     return `${sign}$${Math.round(abs / 1_000)}K`;
+  return `${sign}$${Math.round(abs)}`;
+}
+
+/**
+ * Equity curve over the account's starting size: a dashed baseline at the
+ * starting balance, the line green above it and red below, with a $ / % toggle.
+ *
+ * Without a starting size (the "All Accounts" view) the curve is plain
+ * cumulative P&L from zero and percent is unavailable — there is nothing
+ * truthful to take a percentage of.
+ */
+function EquityCurveCard({ trades, accountSize }: { trades: Trade[]; accountSize: number | null }) {
+  const [mode, setMode] = useState<"$" | "%">("$");
+
   const sorted = useMemo(() =>
     [...trades].filter(t => t.decision === "TAKE" && t.pnl != null)
       .sort((a, b) => a.date.localeCompare(b.date)), [trades]);
 
+  const base = accountSize ?? 0;
+  const pct  = mode === "%" && accountSize !== null && accountSize > 0;
+
+  // Baseline first, then the balance after each trade
+  const series = useMemo(() => {
+    let cum = 0;
+    return [base, ...sorted.map(t => { cum += t.pnl ?? 0; return base + cum; })];
+  }, [sorted, base]);
+
+  const netPnl = series[series.length - 1] - base;
+  const toDisplay = (v: number) => pct ? ((v - base) / base) * 100 : v;
+  const fmtAxis = (v: number) => pct ? `${v >= 0 ? "" : "-"}${Math.abs(v).toFixed(1)}%` : axisMoney(v);
+
   if (sorted.length < 2) {
     return (
-      <div className="flex items-center justify-center h-32" style={{ color: "#333" }}>
-        <p className="font-mono text-xs">Need 2+ trades to show curve</p>
+      <div className="rounded-xl p-5" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+        <div className="flex items-center gap-2 mb-1">
+          <TrendingUp size={17} style={{ color: "#FF3B3B" }} />
+          <h4 className="font-sans font-bold text-white text-base">Equity Curve</h4>
+        </div>
+        <div className="flex items-center justify-center h-40" style={{ color: "#444" }}>
+          <p className="font-sans text-sm">Need 2+ closed trades to show the curve</p>
+        </div>
       </div>
     );
   }
 
-  const points: number[] = [];
-  let cum = 0;
-  sorted.forEach(t => { cum += t.pnl ?? 0; points.push(cum); });
+  const dvals = series.map(toDisplay);
+  const dbase = toDisplay(base);
+  const lo = Math.min(...dvals, dbase);
+  const hi = Math.max(...dvals, dbase);
+  const spanRaw = hi - lo || Math.abs(dbase) * 0.1 || 1;
+  const padV = spanRaw * 0.35;                 // headroom so the line isn't flush
+  const min = lo - padV, max = hi + padV;
+  const span = max - min;
 
-  const min = Math.min(0, ...points);
-  const max = Math.max(0, ...points);
-  const range = max - min || 1;
-  const W = 500, H = 100;
-  const pad = 8;
+  const W = 720, H = 260, padL = 62, padR = 16, padT = 16, padB = 30;
+  const x = (i: number) => padL + (i / (series.length - 1)) * (W - padL - padR);
+  const y = (v: number) => padT + (1 - (v - min) / span) * (H - padT - padB);
 
-  const coords = points.map((v, i) => ({
-    x: pad + (i / (points.length - 1)) * (W - pad * 2),
-    y: H - pad - ((v - min) / range) * (H - pad * 2),
-  }));
+  const pts = dvals.map((v, i) => ({ x: x(i), y: y(v) }));
+  const baseY = y(dbase);
 
-  const d = coords.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
-  const fill = `${d} L ${coords[coords.length - 1].x} ${H} L ${coords[0].x} ${H} Z`;
-  const isPositive = points[points.length - 1] >= 0;
-  const lineColor = isPositive ? "#00FF7F" : "#FF3B3B";
+  // Split the path where it crosses the baseline so each part takes its colour
+  const segments: { d: string; up: boolean }[] = [];
+  for (let i = 0; i < pts.length - 1; i++) {
+    const a = dvals[i], b = dvals[i + 1];
+    const aUp = a >= dbase, bUp = b >= dbase;
+    if (aUp === bUp) {
+      segments.push({ d: `M ${pts[i].x} ${pts[i].y} L ${pts[i + 1].x} ${pts[i + 1].y}`, up: aUp });
+    } else {
+      const t = (dbase - a) / (b - a);          // crossing point
+      const cx = pts[i].x + (pts[i + 1].x - pts[i].x) * t;
+      segments.push({ d: `M ${pts[i].x} ${pts[i].y} L ${cx} ${baseY}`, up: aUp });
+      segments.push({ d: `M ${cx} ${baseY} L ${pts[i + 1].x} ${pts[i + 1].y}`, up: bUp });
+    }
+  }
 
-  const zeroY = H - pad - ((0 - min) / range) * (H - pad * 2);
+  const ticks = Array.from({ length: 5 }, (_, i) => max - (i / 4) * span);
+  const day = (d: string) => new Date(d + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 120 }}>
-      <defs>
-        <linearGradient id="eq-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={lineColor} stopOpacity="0.25" />
-          <stop offset="100%" stopColor={lineColor} stopOpacity="0.02" />
-        </linearGradient>
-      </defs>
-      <line x1={pad} y1={zeroY} x2={W - pad} y2={zeroY} stroke="#1A1A1A" strokeWidth="1" strokeDasharray="4 4" />
-      <path d={fill} fill="url(#eq-grad)" />
-      <path d={d} fill="none" stroke={lineColor} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" />
-      {coords.map((p, i) => i === coords.length - 1 && (
-        <circle key={i} cx={p.x} cy={p.y} r="3" fill={lineColor} />
-      ))}
-    </svg>
+    <div className="rounded-xl p-5" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+      <div className="flex items-start justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <TrendingUp size={17} style={{ color: "#FF3B3B" }} />
+          <h4 className="font-sans font-bold text-white text-base">Equity Curve</h4>
+          <span title="Account balance after each closed trade. The dashed line is your starting size.">
+            <Info size={13} style={{ color: "#555" }} />
+          </span>
+        </div>
+        <div className="flex rounded-lg overflow-hidden shrink-0" style={{ border: "1px solid #262626" }}>
+          {(["$", "%"] as const).map(m => {
+            const active = mode === m;
+            const usable = m === "$" || (accountSize !== null && accountSize > 0);
+            return (
+              <button key={m} onClick={() => usable && setMode(m)}
+                title={usable ? undefined : "Pick a single account to see percentages"}
+                className="px-3.5 py-1.5 font-sans text-sm font-semibold transition-all"
+                style={{
+                  background: active ? "#EF4444" : "transparent",
+                  color: active ? "#fff" : usable ? "#8A8A8A" : "#3A3A3A",
+                  cursor: usable ? "pointer" : "not-allowed",
+                }}>
+                {m}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mb-3">
+        <p className="font-sans text-sm" style={{ color: "#8A8A8A" }}>
+          Account size: <span className="font-semibold" style={{ color: "#E0E0E0" }}>
+            {accountSize !== null ? axisMoney(accountSize) : "None"}
+          </span>
+        </p>
+        <p className="font-sans text-lg font-bold" style={{ color: netPnl >= 0 ? "#22C55E" : "#EF4444" }}>
+          {netPnl >= 0 ? "+" : "−"}{pct
+            ? `${Math.abs((netPnl / base) * 100).toFixed(2)}%`
+            : `$${Math.abs(netPnl).toFixed(2)}`}
+        </p>
+      </div>
+
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 260 }}>
+        {ticks.map((t, i) => (
+          <text key={i} x={padL - 10} y={y(t) + 4} textAnchor="end"
+            className="font-sans" fontSize="11" fill="#8A8A8A">
+            {fmtAxis(t)}
+          </text>
+        ))}
+
+        {/* Starting balance */}
+        <line x1={padL} y1={baseY} x2={W - padR} y2={baseY}
+          stroke="#5A5A5A" strokeWidth="1.5" strokeDasharray="7 6" />
+
+        {segments.map((s, i) => (
+          <path key={i} d={s.d} fill="none" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round"
+            stroke={s.up ? "#22C55E" : "#EF4444"} />
+        ))}
+
+        <text x={padL} y={H - 8} className="font-sans" fontSize="11" fill="#8A8A8A">
+          {day(sorted[0].date)}
+        </text>
+        <text x={W - padR} y={H - 8} textAnchor="end" className="font-sans" fontSize="11" fill="#8A8A8A">
+          {day(sorted[sorted.length - 1].date)}
+        </text>
+      </svg>
+    </div>
   );
 }
 
@@ -489,6 +593,13 @@ export default function ProfilePage() {
   const [accountId,   setAccountId]   = useState("All Accounts");
   const [accounts,    setAccounts]    = useState<ProfileAccount[]>([]);
   const [tradeLinks,  setTradeLinks]  = useState<Record<string, string>>({});
+
+  // Starting balance of the account in view. "All Accounts" mixes several
+  // sizes, so there is no single figure to plot the curve against.
+  const selectedAccountSize = useMemo(() => {
+    if (accountId === "All Accounts") return null;
+    return accounts.find(a => a.id === accountId)?.balance ?? null;
+  }, [accountId, accounts]);
 
   // Profile picture (stored locally as a data URL)
   const [avatar, setAvatar] = useState<string | null>(null);
@@ -868,31 +979,23 @@ export default function ProfilePage() {
       {/* Visual Analytics */}
       <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
         <SectionHeader icon={Activity} title="Visual Analytics" sub="Performance charts and distribution" color="#6AECE1" />
-        <div className="grid grid-cols-3 gap-5">
-          {/* Equity Curve */}
-          <div className="col-span-2 rounded-xl p-4" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-mono text-[10px] uppercase tracking-widest" style={{ color: "#444" }}>Equity Curve (P&L)</p>
-              <span className="font-mono text-xs font-bold" style={{ color: totalPnl >= 0 ? "#00FF7F" : "#FF3B3B" }}>
-                {totalPnl >= 0 ? "+" : ""}${totalPnl.toFixed(2)}
-              </span>
-            </div>
-            <EquityCurve trades={trades} />
-          </div>
+        {/* Equity Curve — full width above the split */}
+        <div className="mb-5">
+          <EquityCurveCard trades={trades} accountSize={selectedAccountSize} />
+        </div>
 
-          {/* Outcome Distribution */}
-          <div className="rounded-xl p-4" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
-            <p className="font-mono text-[10px] uppercase tracking-widest mb-3" style={{ color: "#444" }}>Outcome Split</p>
+        {/* Outcome Distribution */}
+        <div className="rounded-xl p-4" style={{ background: "#0A0A0A", border: "1px solid #1A1A1A" }}>
+          <p className="font-mono text-[10px] uppercase tracking-widest mb-3" style={{ color: "#444" }}>Outcome Split</p>
+          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-5 items-center">
             <OutcomeDonut wins={wins.length} losses={losses.length} bes={bes.length} />
-            <div className="mt-4 pt-3 border-t" style={{ borderColor: "#1A1A1A" }}>
-              <div className="grid grid-cols-2 gap-2">
-                {grades.map(({ grade, color, bg, count }) => (
-                  <div key={grade} className="p-2 rounded-lg text-center" style={{ background: bg, border: `1px solid ${color}22` }}>
-                    <p className="font-mono font-black text-base" style={{ color }}>{grade}</p>
-                    <p className="font-mono text-xs text-white font-bold">{count}</p>
-                  </div>
-                ))}
-              </div>
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              {grades.map(({ grade, color, bg, count }) => (
+                <div key={grade} className="p-2 rounded-lg text-center" style={{ background: bg, border: `1px solid ${color}22` }}>
+                  <p className="font-sans font-black text-base" style={{ color }}>{grade}</p>
+                  <p className="font-sans text-xs text-white font-bold">{count}</p>
+                </div>
+              ))}
             </div>
           </div>
         </div>
