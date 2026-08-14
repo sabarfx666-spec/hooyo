@@ -4,6 +4,7 @@ import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
 import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink, Sparkles, Info, CreditCard, ImagePlus, X, Sun } from "lucide-react";
 import { RITUAL_HISTORY_KEY, RitualHistory } from "@/components/journal/DailyRitual";
+import { MonthlyReport } from "@/components/profile/MonthlyReport";
 import Link from "next/link";
 import { useAuth } from "@/store/AuthContext";
 import { buildNotionMarkdown } from "@/lib/notionExport";
@@ -975,6 +976,9 @@ export default function ProfilePage() {
         <SectionHeader icon={Calendar} title="Trade Calendar" sub="Monthly P&L heatmap by trading day" color="#6AECE1" />
         <TradeCalendar trades={trades} />
       </div>
+
+      {/* Monthly report + discipline over time */}
+      <MonthlyReport trades={trades} />
 
       {/* Visual Analytics */}
       <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>

@@ -209,3 +209,28 @@ input[type="range"]::-webkit-slider-thumb:active {
 .card-hover:hover {
   transform: translateY(-2px);
 }
+
+/* ── Printing the monthly report ──────────────────────────────
+   Export PDF calls window.print(). Everything but #monthly-report is
+   hidden, and the report is lifted to the top of a white page so the
+   browser Save-as-PDF output is a clean one-section document. */
+.print-only { display: none; }
+
+@media print {
+  body * { visibility: hidden; }
+  #monthly-report, #monthly-report * { visibility: visible; }
+  #monthly-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    /* Keep the dark card: the report's text and tags are light-on-dark, so a
+       white page would erase most of it. */
+    background: #0D0D0D !important;
+    padding: 24px !important;
+  }
+  .no-print { display: none !important; }
+  .print-only { display: block; }
+  /* Keep bar colours in the PDF — browsers drop backgrounds otherwise */
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
