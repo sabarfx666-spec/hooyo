@@ -5,6 +5,11 @@ import { Sun, Moon, Shield, CheckCircle2, X, AlertTriangle, Plus, Star, Trash2 }
 const RITUAL_KEY = "sabar-daily-ritual";
 const SKIP_KEY   = "sabar-ritual-skip";
 const CUSTOM_KEY = "sabar-custom-rituals";
+export const RITUAL_HISTORY_KEY = "sabar-ritual-history";
+const HISTORY_KEY = RITUAL_HISTORY_KEY;
+
+/** One entry per day: how many rituals were ticked and whether it was finished. */
+export type RitualHistory = Record<string, { done: number; total: number; completed: boolean }>;
 
 const GREEN = "#22C55E";
 const RED   = "#EF4444";
@@ -88,7 +93,14 @@ export function DailyRitual() {
   const color = pct === 100 ? GREEN : pct > 0 ? AMBER : RED;
 
   const persist = (nextChecks: boolean[], completed = false) => {
-    try { localStorage.setItem(RITUAL_KEY, JSON.stringify({ date: today, checks: nextChecks, completed })); } catch {}
+    try {
+      localStorage.setItem(RITUAL_KEY, JSON.stringify({ date: today, checks: nextChecks, completed }));
+      // Keep a per-day record so Profile can show the last 7 days. RITUAL_KEY
+      // only ever holds today, so without this the history is lost each night.
+      const hist: RitualHistory = JSON.parse(localStorage.getItem(HISTORY_KEY) ?? "{}");
+      hist[today] = { done: nextChecks.filter(Boolean).length, total: nextChecks.length, completed };
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(hist));
+    } catch {}
   };
   const saveCustom = (list: string[]) => {
     setCustom(list);

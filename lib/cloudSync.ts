@@ -30,6 +30,7 @@ const EXTRA_KEYS = [
   "sabar-profile-avatar",
   "sabar-custom-rituals",
   "sabar-daily-ritual",
+  "sabar-ritual-history",
   "sabar-ritual-skip",
   "sabar-psych-note",
   // Superseded by sabar-outlook-entries. Kept so existing cloud copies of the

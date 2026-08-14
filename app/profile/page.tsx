@@ -2,11 +2,113 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSabar } from "@/store/SabarContext";
 import { Trade } from "@/store/types";
-import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink, Sparkles, Info, CreditCard, ImagePlus, X } from "lucide-react";
+import { ArrowLeft, User, TrendingUp, Target, BarChart2, Activity, Brain, Clock, BookOpen, Layers, ChevronLeft, ChevronRight, Calendar, ClipboardCopy, Check, RefreshCw, Link2, Unlink, Sparkles, Info, CreditCard, ImagePlus, X, Sun } from "lucide-react";
+import { RITUAL_HISTORY_KEY, RitualHistory } from "@/components/journal/DailyRitual";
 import Link from "next/link";
 import { useAuth } from "@/store/AuthContext";
 import { buildNotionMarkdown } from "@/lib/notionExport";
 import { notionConnected, notionConnect, notionDisconnect, notionSyncTrades } from "@/lib/notionSync";
+
+/**
+ * Daily Rituals summary: today's readiness plus the last 7 days.
+ *
+ * History only exists from the day this was added — earlier days have nothing
+ * recorded and show a dash rather than a guess.
+ */
+function DailyRitualCard() {
+  const [today, setToday]     = useState<{ done: number; total: number; completed: boolean } | null>(null);
+  const [history, setHistory] = useState<RitualHistory>({});
+  const [mounted, setMounted] = useState(false);
+
+  const todayKey = new Date().toISOString().split("T")[0];
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const hist: RitualHistory = JSON.parse(localStorage.getItem(RITUAL_HISTORY_KEY) ?? "{}");
+      setHistory(hist);
+      const raw = localStorage.getItem("sabar-daily-ritual");
+      const saved = raw ? JSON.parse(raw) as { date: string; checks: boolean[]; completed: boolean } : null;
+      if (saved?.date === todayKey) {
+        setToday({
+          done: saved.checks.filter(Boolean).length,
+          total: saved.checks.length,
+          completed: saved.completed,
+        });
+      }
+    } catch {}
+  }, [todayKey]);
+
+  if (!mounted) return null;
+
+  const done  = today?.done ?? 0;
+  const total = today?.total ?? 0;
+  const pct   = total > 0 ? Math.round((done / total) * 100) : 0;
+  const barColor = pct === 100 ? "#22C55E" : pct > 0 ? "#F59E0B" : "#EF4444";
+
+  // Last 7 days, oldest first
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const key = d.toISOString().split("T")[0];
+    return {
+      key,
+      label: d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 2),
+      entry: history[key],
+    };
+  });
+
+  return (
+    <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
+          style={{ background: "rgba(245,166,35,0.12)", border: "1px solid rgba(245,166,35,0.3)" }}>
+          <Sun size={17} style={{ color: "#F5A623" }} />
+        </div>
+        <div>
+          <h3 className="font-sans font-bold text-white text-base">Daily Rituals</h3>
+          <p className="font-sans text-[11px]" style={{ color: "#8A8A8A" }}>Your pre-market routine</p>
+        </div>
+      </div>
+
+      {/* Today */}
+      <div className="flex items-center justify-between mb-2">
+        <p className="font-sans text-sm" style={{ color: "#D0D0D0" }}>Today&apos;s Readiness</p>
+        <p className="font-sans text-sm font-semibold"
+          style={{ color: today?.completed ? "#22C55E" : total > 0 ? "#F59E0B" : "#8A8A8A" }}>
+          {total === 0 ? "Not completed" : today?.completed ? "Completed" : `${done}/${total} done`}
+        </p>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden mb-5" style={{ background: "#1C1C1C" }}>
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: barColor }} />
+      </div>
+
+      {/* Last 7 days */}
+      <p className="font-sans text-xs mb-2.5" style={{ color: "#8A8A8A" }}>Last 7 days</p>
+      <div className="grid grid-cols-7 gap-1">
+        {days.map(({ key, label, entry }) => {
+          const state = !entry ? "none" : entry.completed ? "done" : entry.done > 0 ? "partial" : "missed";
+          const color = state === "done" ? "#22C55E"
+                      : state === "partial" ? "#F59E0B"
+                      : state === "missed" ? "#EF4444" : "#3A3A3A";
+          return (
+            <div key={key} className="flex flex-col items-center gap-1.5">
+              <div className="w-7 h-7 rounded-full flex items-center justify-center"
+                style={{ border: `1.5px solid ${color}`, background: state === "none" ? "transparent" : `${color}1A` }}>
+                {state === "done"    && <Check size={13} style={{ color }} strokeWidth={3} />}
+                {state === "partial" && <span className="w-1.5 h-1.5 rounded-full" style={{ background: color }} />}
+                {state === "missed"  && <X size={12} style={{ color }} strokeWidth={3} />}
+                {state === "none"    && <span className="font-sans text-xs" style={{ color }}>–</span>}
+              </div>
+              <span className="font-sans text-[10px]" style={{ color: "#666" }}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function fmt(n: number) {
   const abs = Math.abs(n);
@@ -686,6 +788,11 @@ export default function ProfilePage() {
           )}
         </div>
 
+        <div className="space-y-4">
+
+        {/* Daily Rituals */}
+        <DailyRitualCard />
+
         {/* AI Review */}
         <div className="rounded-xl p-5" style={{ background: "#0D0D0D", border: "1px solid #1A1A1A" }}>
           <div className="flex items-center gap-2.5 mb-4">
@@ -725,6 +832,7 @@ export default function ProfilePage() {
             <span className="font-bold">Note:</span> These insights are based on your historical trading data.
             They are for self-improvement only and do not constitute financial advice.
           </p>
+        </div>
         </div>
       </div>
 
