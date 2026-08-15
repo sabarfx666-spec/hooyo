@@ -76,15 +76,15 @@ export function DailyNote() {
         )}
       </button>
 
-      {/* Backdrop */}
+      {/* Backdrop — z-[100] clears the topbar (z-60) */}
       {open && (
-        <div className="fixed inset-0 z-50" style={{ background: "rgba(0,0,0,0.6)" }}
+        <div className="fixed inset-0 z-[100]" style={{ background: "rgba(0,0,0,0.6)" }}
           onClick={() => setOpen(false)} />
       )}
 
       {/* Drawer */}
       <div
-        className="fixed top-0 left-0 h-full z-50 flex flex-col transition-transform duration-300"
+        className="fixed top-0 left-0 h-full z-[100] flex flex-col transition-transform duration-300"
         style={{
           width: "min(400px, 88vw)",
           background: "#0A0A0A",

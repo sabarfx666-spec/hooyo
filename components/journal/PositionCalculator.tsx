@@ -58,14 +58,14 @@ export function PositionCalculator() {
         <Calculator size={18} style={{ color: "#E53E3E" }} />
       </button>
 
-      {/* Backdrop */}
+      {/* Backdrop — z-[100] clears the topbar (z-60) */}
       {open && (
-        <div className="fixed inset-0 z-50" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setOpen(false)} />
+        <div className="fixed inset-0 z-[100]" style={{ background: "rgba(0,0,0,0.6)" }} onClick={() => setOpen(false)} />
       )}
 
       {/* Slide-in panel from left */}
       <div
-        className="fixed top-0 left-0 h-full z-50 flex flex-col overflow-y-auto transition-transform duration-300"
+        className="fixed top-0 left-0 h-full z-[100] flex flex-col overflow-y-auto transition-transform duration-300"
         style={{
           width: 340,
           background: "#0D0D0D",

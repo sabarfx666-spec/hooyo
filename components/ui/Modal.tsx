@@ -21,7 +21,8 @@ export function Modal({ open, onClose, title, children }: ModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={onClose}>
+    // z-[100] so dialogs clear the topbar (z-60) and the template bar (z-50)
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70" onClick={onClose}>
       <div
         ref={ref}
         className="bg-[#0D0D0D] border border-[#2A2A2A] rounded-lg p-6 min-w-[320px] max-w-md w-full mx-4"

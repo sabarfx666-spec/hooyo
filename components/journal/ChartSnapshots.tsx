@@ -88,7 +88,7 @@ function ManageSlotsModal({ slots, onSave, onClose }: { slots: Slot[]; onSave: (
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.7)" }}>
       <div className="w-full max-w-md rounded-2xl p-5 space-y-4" style={{ background: "#111", border: "1px solid #2A2A2A" }}>
         <div className="flex items-center justify-between">
           <h3 className="font-sans font-bold text-white">Manage Slots</h3>

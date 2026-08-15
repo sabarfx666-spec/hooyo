@@ -137,7 +137,9 @@ export function DailyRitual() {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto"
+    // z-[100] clears the topbar (z-60) and the template bar (z-50) — at z-50
+    // this modal rendered underneath both of them.
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)" }}>
 
       <div className="w-full max-w-lg rounded-2xl p-6 my-8 anim-pop"
