@@ -80,6 +80,13 @@ const stripImages = (t: Trade): Trade => {
   return rest as Trade;
 };
 
+/** Missing, empty, or an empty JSON list/object — nothing worth keeping. */
+function isBlank(v: string | undefined | null): boolean {
+  if (v == null) return true;
+  const s = v.trim();
+  return s === "" || s === "[]" || s === "{}" || s === "null";
+}
+
 async function uid(): Promise<string | null> {
   const sb = getSupabase();
   if (!sb) return null;
@@ -132,6 +139,20 @@ export async function cloudPush(state: SabarState): Promise<boolean> {
   if (!existing.spaces && existing.state) {
     spaces["default"] = { state: existing.state, extras: existing.extras }; // migrate legacy shape
   }
+
+  // Never let a device with nothing blank out data the cloud already holds.
+  // Weekly outlooks, notes and accounts live in localStorage keys that no
+  // timestamp covers, so a browser that has not loaded them yet would otherwise
+  // upload an empty list over a full one. Deliberately one-way: this only ever
+  // keeps data. Clearing a list everywhere therefore needs it cleared on the
+  // device that owns it, not merely absent here.
+  const prior = spaces[currentSpaceId()]?.extras ?? {};
+  for (const [k, cloudVal] of Object.entries(prior)) {
+    if (isBlank(payload.extras?.[k]) && !isBlank(cloudVal)) {
+      payload.extras = { ...payload.extras, [k]: cloudVal };
+    }
+  }
+
   spaces[currentSpaceId()] = payload;
 
   const { error } = await sb

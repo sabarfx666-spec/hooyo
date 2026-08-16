@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, useEffect, useRef, useState, ReactNode } from "react";
+import React, { createContext, useContext, useReducer, useEffect, useRef, useState, useMemo, ReactNode } from "react";
 import { SabarState, Action, Trade, Rule, BiasRuleSet } from "./types";
 import { imgSaveTrade, imgLoadTrade, imgDeleteTrade, imgSyncAllToCloud } from "@/lib/db";
 import { cloudEnabled } from "@/lib/supabase";
@@ -304,6 +304,13 @@ export function SabarProvider({ children }: { children: ReactNode }) {
   // Nothing is written back to localStorage until the saved journal has been
   // read in — otherwise the first render saves the seed defaults over real data.
   const localReady = useRef(false);
+  // Only edits the user actually made count as edits. Hydrating from
+  // localStorage or the cloud, and restoring trade images, all change state
+  // without anyone touching anything — stamping those made every page load look
+  // newer than the cloud, so the cloud copy was never applied and this device
+  // pushed over it. That is how journals got wiped. Components dispatch through
+  // userDispatch below, which is the only thing that arms the stamp.
+  const isUserEdit = useRef(false);
 
   // Load from localStorage then rehydrate images from IndexedDB
   useEffect(() => {
@@ -342,8 +349,11 @@ export function SabarProvider({ children }: { children: ReactNode }) {
         const minimal = { ...stripped, trades: [] };
         localStorage.setItem(STORAGE_KEY, JSON.stringify(minimal));
       }
-      // Stamp the edit so a stale cloud copy can't overwrite it on next load
-      localStorage.setItem(LOCAL_EDIT_KEY, String(Date.now()));
+      // Stamp real edits only, so a hydrate can never masquerade as newer work.
+      if (isUserEdit.current) {
+        localStorage.setItem(LOCAL_EDIT_KEY, String(Date.now()));
+        isUserEdit.current = false;
+      }
     } catch {}
   }, [state]);
 
@@ -418,8 +428,14 @@ export function SabarProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tradesJson]);
 
+  // What components get. Anything dispatched from the UI is a real edit, so it
+  // arms the timestamp; the provider's own hydrate/restore dispatches do not.
+  const userDispatch = useMemo<React.Dispatch<Action>>(
+    () => (action) => { isUserEdit.current = true; dispatch(action); },
+    []);
+
   return (
-    <SabarContext.Provider value={{ state, dispatch }}>
+    <SabarContext.Provider value={{ state, dispatch: userDispatch }}>
       {children}
     </SabarContext.Provider>
   );
