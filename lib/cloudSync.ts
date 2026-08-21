@@ -167,4 +167,8 @@ export function applyExtras(extras: Record<string, string> | undefined) {
   for (const [k, v] of Object.entries(extras)) {
     try { localStorage.setItem(k, v); } catch {}
   }
+  // Panels that cache these keys in React state (checklist templates, chart
+  // slots) would keep showing stale or empty data until a reload, so tell
+  // them the store changed underneath.
+  try { window.dispatchEvent(new Event("sabar-templates-changed")); } catch {}
 }
